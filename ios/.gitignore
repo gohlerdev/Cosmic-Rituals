@@ -1,0 +1,12 @@
+native/build/
+native/DerivedData/
+native/.build/
+native/.swiftpm/
+native/**/xcuserdata/
+native/**/*.xcuserstate
+*.ipa
+*.xcarchive
+*.xcresult
+*.dSYM
+*.dSYM.zip
+.DS_Store

@@ -1,0 +1,16 @@
+Cosmic Rituals — Third-Party Data Notice
+
+Offline city and timezone catalog
+
+Source: GeoNames cities15000
+Copyright: © GeoNames contributors
+Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).
+
+GeoNames: https://www.geonames.org/
+License: https://creativecommons.org/licenses/by/4.0/
+
+The bundled world_cities.tsv file is a population-sorted transformation of
+GeoNames cities15000. It retains ASCII place name, latitude, longitude, IANA
+timezone identifier, and country name. Coordinate values are rounded to four
+decimal places. The catalog is bundled for offline location lookup. Cosmic
+Rituals is not affiliated with or endorsed by GeoNames.
