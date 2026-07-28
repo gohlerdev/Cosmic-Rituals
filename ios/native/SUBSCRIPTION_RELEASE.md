@@ -30,6 +30,12 @@ only one introductory offer in a subscription group.
 - Restore Purchases calls `AppStore.sync()` and the StoreKit subscription surface also
   exposes the system restore action.
 - App Shortcuts use the same entitlement check and do not bypass the Premium gate.
+- The dedicated `CosmicRitualsTestFlight` scheme uses the `TestFlight` build
+  configuration to grant clearly labeled testing access when App Store products are
+  unavailable. Production `Release` builds never define that access condition.
+- Never select a testing-access build for the App Store version. Archive the standard
+  `CosmicRituals` scheme for App Review so purchases and verified entitlements remain
+  the only production unlock path.
 
 ## App Store Connect configuration
 

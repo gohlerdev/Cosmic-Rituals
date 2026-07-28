@@ -11,7 +11,7 @@ struct SubscriptionGateView: View {
             switch store.accessState {
             case .storeUnavailable(let message):
                 unavailableView(message: message)
-            case .checking, .locked, .entitled:
+            case .checking, .locked, .entitled, .testingAccess:
                 subscriptionStoreView
             }
 

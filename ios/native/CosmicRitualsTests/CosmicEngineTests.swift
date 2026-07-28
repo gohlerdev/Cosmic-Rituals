@@ -606,6 +606,34 @@ final class CosmicEngineTests: XCTestCase {
         ].allSatisfy { $0.scheme == "https" })
     }
 
+    func testLaunchPolicyKeepsTestingAccessSeparateFromProductionEntitlements() {
+        XCTAssertEqual(
+            SubscriptionLaunchPolicy.initialState(
+                isUITestingPremium: false,
+                isTestingDistribution: false
+            ),
+            .checking
+        )
+        XCTAssertEqual(
+            SubscriptionLaunchPolicy.initialState(
+                isUITestingPremium: true,
+                isTestingDistribution: false
+            ),
+            .entitled
+        )
+        XCTAssertEqual(
+            SubscriptionLaunchPolicy.initialState(
+                isUITestingPremium: false,
+                isTestingDistribution: true
+            ),
+            .testingAccess
+        )
+        XCTAssertTrue(SubscriptionAccessState.testingAccess.hasPremiumAccess)
+        XCTAssertTrue(SubscriptionAccessState.testingAccess.isTestingAccess)
+        XCTAssertFalse(SubscriptionAccessState.entitled.isTestingAccess)
+        XCTAssertFalse(SubscriptionAccessState.storeUnavailable("offline").hasPremiumAccess)
+    }
+
     func testStoreKitConfigurationDeclaresTwoWeekTrialsForEveryProduct() throws {
         let nativeRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

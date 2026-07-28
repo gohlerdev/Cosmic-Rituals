@@ -17,11 +17,31 @@ enum SubscriptionCatalog {
 enum SubscriptionAccessState: Equatable {
     case checking
     case entitled
+    case testingAccess
     case locked
     case storeUnavailable(String)
 
     var hasPremiumAccess: Bool {
-        self == .entitled
+        self == .entitled || self == .testingAccess
+    }
+
+    var isTestingAccess: Bool {
+        self == .testingAccess
+    }
+}
+
+enum SubscriptionLaunchPolicy {
+    static func initialState(
+        isUITestingPremium: Bool,
+        isTestingDistribution: Bool
+    ) -> SubscriptionAccessState {
+        if isUITestingPremium {
+            return .entitled
+        }
+        if isTestingDistribution {
+            return .testingAccess
+        }
+        return .checking
     }
 }
 
