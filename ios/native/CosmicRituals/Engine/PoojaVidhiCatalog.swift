@@ -93,6 +93,57 @@ struct PoojaSourceNote: Identifiable, Hashable, Sendable {
     var id: String { urlString }
 }
 
+/// A factual, derived preparation state. It deliberately avoids a single
+/// decorative "confidence" score: readiness depends on concrete materials,
+/// the practice boundary, and visible source context.
+struct PoojaReadiness: Equatable, Sendable {
+    let requiredMaterialCount: Int
+    let preparedRequiredMaterialCount: Int
+    let optionalMaterialCount: Int
+    let preparedOptionalMaterialCount: Int
+    let sourceCount: Int
+    let practiceLevel: PoojaPracticeLevel
+
+    var remainingRequiredMaterialCount: Int {
+        max(0, requiredMaterialCount - preparedRequiredMaterialCount)
+    }
+
+    var requiredPreparationProgress: Double {
+        guard requiredMaterialCount > 0 else { return 1 }
+        return Double(preparedRequiredMaterialCount) / Double(requiredMaterialCount)
+    }
+
+    var hasPreparedRequiredMaterials: Bool {
+        remainingRequiredMaterialCount == 0
+    }
+
+    var materialStatus: String {
+        if hasPreparedRequiredMaterials {
+            switch requiredMaterialCount {
+            case 0:
+                return "No required materials"
+            case 1:
+                return "Required material marked ready"
+            default:
+                return "All \(requiredMaterialCount) required materials marked ready"
+            }
+        }
+        let noun = remainingRequiredMaterialCount == 1 ? "item" : "items"
+        return "\(remainingRequiredMaterialCount) required \(noun) left to review"
+    }
+
+    var practiceStatus: String {
+        practiceLevel == .priestRecommended
+            ? "Qualified practitioner recommended"
+            : practiceLevel.displayName
+    }
+
+    var sourceStatus: String {
+        let noun = sourceCount == 1 ? "reference" : "references"
+        return "\(sourceCount) cited \(noun) · reviewed \(PoojaContentPolicy.sourceReviewDate)"
+    }
+}
+
 struct PoojaVidhi: Identifiable, Hashable, Sendable {
     let id: String
     let title: String
@@ -128,6 +179,19 @@ struct PoojaVidhi: Identifiable, Hashable, Sendable {
                  step.mantra?.transliteration ?? "", step.mantra?.meaning ?? ""]
             })
             .joined(separator: " ")
+    }
+
+    func readiness(preparedMaterialIDs: Set<String>) -> PoojaReadiness {
+        let required = materials.filter(\.isRequired)
+        let optional = materials.filter { !$0.isRequired }
+        return PoojaReadiness(
+            requiredMaterialCount: required.count,
+            preparedRequiredMaterialCount: required.filter { preparedMaterialIDs.contains($0.id) }.count,
+            optionalMaterialCount: optional.count,
+            preparedOptionalMaterialCount: optional.filter { preparedMaterialIDs.contains($0.id) }.count,
+            sourceCount: sourceNotes.count,
+            practiceLevel: practiceLevel
+        )
     }
 
     var shareText: String {

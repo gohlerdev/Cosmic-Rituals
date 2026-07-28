@@ -21,7 +21,7 @@ struct MuhurtaDetailView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                CosmicStarfieldBackground()
+                RitualSanctuaryBackground()
                 ScrollView {
                     VStack(spacing: 16) {
                         header

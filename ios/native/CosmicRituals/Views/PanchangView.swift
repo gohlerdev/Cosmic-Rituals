@@ -26,7 +26,7 @@ struct PanchangView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                CosmicStarfieldBackground()
+                RitualSanctuaryBackground()
                 VStack(spacing: 0) {
                     if selectedTab != 3 {
                         LocationContextBar(manager: locationManager) {
@@ -854,7 +854,7 @@ private struct ThemePickerSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                CosmicStarfieldBackground()
+                RitualSanctuaryBackground()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         // Experience layout (independent from color appearance)

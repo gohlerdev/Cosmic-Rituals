@@ -548,6 +548,33 @@ final class CosmicEngineTests: XCTestCase {
         }
     }
 
+    func testPoojaReadinessCountsRequiredAndOptionalMaterialsSeparately() throws {
+        let vidhi = try XCTUnwrap(PoojaVidhiCatalog.all.first { $0.id == "griha-pravesh" })
+        let requiredIDs = Set(vidhi.materials.filter(\.isRequired).map(\.id))
+        let optionalIDs = Set(vidhi.materials.filter { !$0.isRequired }.map(\.id))
+
+        let initial = vidhi.readiness(preparedMaterialIDs: [])
+        XCTAssertEqual(initial.requiredMaterialCount, requiredIDs.count)
+        XCTAssertEqual(initial.optionalMaterialCount, optionalIDs.count)
+        XCTAssertEqual(initial.requiredPreparationProgress, 0)
+        XCTAssertFalse(initial.hasPreparedRequiredMaterials)
+        XCTAssertEqual(initial.sourceCount, vidhi.sourceNotes.count)
+        XCTAssertEqual(initial.practiceStatus, "Qualified practitioner recommended")
+        XCTAssertTrue(initial.materialStatus.contains("\(requiredIDs.count) required"))
+        XCTAssertTrue(initial.sourceStatus.contains("\(vidhi.sourceNotes.count) cited"))
+
+        let prepared = vidhi.readiness(preparedMaterialIDs: requiredIDs.union(optionalIDs.prefix(1)))
+        XCTAssertEqual(prepared.preparedRequiredMaterialCount, requiredIDs.count)
+        XCTAssertEqual(prepared.preparedOptionalMaterialCount, min(1, optionalIDs.count))
+        XCTAssertEqual(prepared.requiredPreparationProgress, 1)
+        XCTAssertTrue(prepared.hasPreparedRequiredMaterials)
+        XCTAssertEqual(prepared.remainingRequiredMaterialCount, 0)
+        let expectedMaterialStatus = requiredIDs.count == 1
+            ? "Required material marked ready"
+            : "All \(requiredIDs.count) required materials marked ready"
+        XCTAssertEqual(prepared.materialStatus, expectedMaterialStatus)
+    }
+
     func testPoojaSearchCoversPanditGPTPublicStarterPillars() {
         XCTAssertEqual(PoojaVidhiCatalog.search("Lakshmi at home").first?.id, "lakshmi-home")
         XCTAssertEqual(PoojaVidhiCatalog.search("Griha Pravesh").first?.id, "griha-pravesh")
@@ -721,6 +748,22 @@ final class CosmicEngineTests: XCTestCase {
         }
     }
 
+    func testThemeNamesExpressAUniqueCeremonialIdentity() {
+        XCTAssertEqual(
+            CosmicThemeVariant.allCases.map(\.displayName),
+            ["Deep Sandhya", "Temple Dawn", "Kumkum Night", "Ghee Lamp Ivory", "Sandalwood", "Lotus Ash"]
+        )
+        XCTAssertTrue(CosmicThemeVariant.allCases.allSatisfy {
+            !$0.displayName.localizedCaseInsensitiveContains("cosmic")
+                && !$0.displayName.localizedCaseInsensitiveContains("celestial")
+                && !$0.displayName.localizedCaseInsensitiveContains("aurora")
+        })
+    }
+
+    func testRitualSanctuaryBackgroundAssetIsBundled() {
+        XCTAssertNotNil(UIImage(named: "RitualSanctuaryBackground"))
+    }
+
     func testSelectedControlForegroundRemainsLegibleAcrossEveryTheme() {
         for theme in CosmicThemeVariant.allCases.map(\.colorScheme) {
             XCTAssertGreaterThanOrEqual(
@@ -764,9 +807,32 @@ final class CosmicEngineTests: XCTestCase {
 
     @MainActor
     func testPoojaPrimaryScreensRenderAtPhoneAndAccessibilitySizes() async {
+        let delhi = context(2026, 7, 24, latitude: 28.6139, longitude: 77.2090, timeZone: "Asia/Kolkata")
+        let panchangValue = CosmicEngine.getPanchang(context: delhi)
+        let panchang = NavigationStack {
+            ZStack {
+                RitualSanctuaryBackground()
+                ScrollView {
+                    PanchangExperienceHome(
+                        mode: .ritualNow,
+                        selectedDate: .constant(delhi.localDay),
+                        panchang: panchangValue,
+                        showTithiDetail: {},
+                        showYogaDetail: {},
+                        showKaranaDetail: {}
+                    )
+                    .padding()
+                }
+            }
+            .navigationTitle("Panchang")
+        }
+        .environment(\.cosmicTheme, CosmicColorScheme.obsidianGold)
+        .environment(\.timeZone, delhi.timeZone)
+        .preferredColorScheme(.dark)
+
         let library = NavigationStack {
             ZStack {
-                CosmicStarfieldBackground()
+                RitualSanctuaryBackground()
                 PoojaVidhiLibraryView()
             }
             .navigationTitle("Pooja")
@@ -787,6 +853,7 @@ final class CosmicEngineTests: XCTestCase {
         .environment(\.dynamicTypeSize, .accessibility2)
         .preferredColorScheme(.light)
 
+        await attachSnapshot(panchang, name: "Panchang Calculation Disclosure")
         await attachSnapshot(library, name: "Pooja Library")
         await attachSnapshot(detail, name: "Lakshmi Vidhi Detail")
         await attachSnapshot(guided, name: "Guided Pooja Accessibility Text")

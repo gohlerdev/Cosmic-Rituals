@@ -7,7 +7,7 @@ struct SubscriptionGateView: View {
 
     var body: some View {
         ZStack {
-            CosmicStarfieldBackground()
+            RitualSanctuaryBackground()
             switch store.accessState {
             case .storeUnavailable(let message):
                 unavailableView(message: message)

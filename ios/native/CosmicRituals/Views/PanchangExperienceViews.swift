@@ -106,21 +106,11 @@ struct PanchangExperienceHome: View {
     let showYogaDetail: () -> Void
     let showKaranaDetail: () -> Void
 
-    @Environment(\.cosmicTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.timeZone) private var timeZone
 
     var body: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: "clock.badge.info")
-                    .foregroundStyle(theme.primary)
-                Text(panchang.referenceDisclosure(in: timeZone))
-                    .foregroundStyle(theme.semanticSecondaryText)
-                Spacer(minLength: 0)
-            }
-            .font(.caption2.weight(.medium))
-            .accessibilityElement(children: .combine)
+            RitualCalculationSeal(panchang: panchang)
 
             Group {
                 switch mode {
@@ -156,6 +146,67 @@ struct PanchangExperienceHome: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(mode.displayName) Panchang experience")
+    }
+}
+
+/// Keeps the calculation contract beside the result instead of burying it in
+/// Settings. This is disclosure, not an accuracy percentage or certification.
+private struct RitualCalculationSeal: View {
+    let panchang: Panchang
+
+    @Environment(\.cosmicTheme) private var theme
+    @Environment(\.timeZone) private var timeZone
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 8) {
+                Label("Ritual-day calculation", systemImage: "checkmark.seal.fill")
+                    .font(.caption.weight(.bold))
+                    .fontDesign(.serif)
+                    .foregroundStyle(theme.semanticPrimaryText)
+                Spacer(minLength: 8)
+                Text("ON DEVICE")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .tracking(0.8)
+                    .foregroundStyle(theme.primary)
+            }
+
+            Text(panchang.referenceDisclosure(in: timeZone))
+                .font(.caption)
+                .foregroundStyle(theme.semanticSecondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { calculationDetails }
+                VStack(alignment: .leading, spacing: 5) { calculationDetails }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            theme.surface.opacity(theme.isLight ? 0.92 : 0.76),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .overlay(alignment: .leading) {
+            Capsule()
+                .fill(theme.primary)
+                .frame(width: 3)
+                .padding(.vertical, 12)
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(theme.semanticBorder, lineWidth: 0.6)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "Ritual-day calculation, on device. \(panchang.referenceDisclosure(in: timeZone)). Lahiri sidereal system. Time zone \(timeZone.identifier)."
+        )
+    }
+
+    @ViewBuilder
+    private var calculationDetails: some View {
+        Label("Lahiri sidereal", systemImage: "circle.grid.cross.fill")
+        Label(timeZone.identifier, systemImage: "globe.asia.australia.fill")
     }
 }
 

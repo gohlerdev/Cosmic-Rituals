@@ -81,6 +81,11 @@ struct PoojaVidhiLibraryView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(theme.primary)
 
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { libraryTrustPills }
+                    VStack(alignment: .leading, spacing: 8) { libraryTrustPills }
+                }
+
                 Text(PoojaContentPolicy.householdScope)
                     .font(.caption)
                     .foregroundStyle(theme.semanticSecondaryText)
@@ -88,7 +93,14 @@ struct PoojaVidhiLibraryView: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Pooja Vidhis. Twelve offline household and preparation guides. Family and temple tradition takes precedence.")
+        .accessibilityLabel("Pooja Vidhis. \(PoojaVidhiCatalog.all.count) offline household and preparation guides. Family and temple tradition takes precedence.")
+    }
+
+    @ViewBuilder
+    private var libraryTrustPills: some View {
+        PoojaMetadataPill(text: "\(PoojaVidhiCatalog.all.count) guided rites", symbol: "hands.and.sparkles.fill")
+        PoojaMetadataPill(text: "Source adapted", symbol: "books.vertical.fill")
+        PoojaMetadataPill(text: "Offline", symbol: "lock.shield.fill")
     }
 
     private var categoryPicker: some View {
@@ -194,16 +206,20 @@ struct PoojaVidhiDetailView: View {
     @Environment(\.cosmicTheme) private var theme
 
     private var preparationProgress: Double {
-        guard !vidhi.materials.isEmpty else { return 0 }
-        return Double(preparedMaterialIDs.count) / Double(vidhi.materials.count)
+        readiness.requiredPreparationProgress
+    }
+
+    private var readiness: PoojaReadiness {
+        vidhi.readiness(preparedMaterialIDs: preparedMaterialIDs)
     }
 
     var body: some View {
         ZStack {
-            CosmicStarfieldBackground()
+            RitualSanctuaryBackground()
             ScrollView {
                 LazyVStack(spacing: 16) {
                     hero
+                    readinessSection
                     practiceBoundary
                     preparationSection
                     materialsSection
@@ -234,8 +250,8 @@ struct PoojaVidhiDetailView: View {
                 GuidedPoojaView(vidhi: vidhi)
             } label: {
                 Label(
-                    vidhi.practiceLevel == .priestRecommended ? "Open ceremony guide" : "Begin guided Pooja",
-                    systemImage: "play.fill"
+                    beginActionTitle,
+                    systemImage: beginActionSymbol
                 )
                 .font(.headline)
                 .frame(maxWidth: .infinity)
@@ -249,6 +265,20 @@ struct PoojaVidhiDetailView: View {
             .background(.ultraThinMaterial)
             .accessibilityIdentifier("pooja.begin.\(vidhi.id)")
         }
+    }
+
+    private var beginActionTitle: String {
+        if vidhi.practiceLevel == .priestRecommended {
+            return "Open ceremony guide"
+        }
+        if readiness.hasPreparedRequiredMaterials {
+            return "Begin guided Pooja"
+        }
+        return "Review guide · \(readiness.remainingRequiredMaterialCount) required left"
+    }
+
+    private var beginActionSymbol: String {
+        readiness.hasPreparedRequiredMaterials ? "play.fill" : "book.pages.fill"
     }
 
     private var hero: some View {
@@ -306,6 +336,56 @@ struct PoojaVidhiDetailView: View {
         PoojaMetadataPill(text: vidhi.practiceLevel.displayName, symbol: vidhi.practiceLevel == .priestRecommended ? "person.badge.shield.checkmark.fill" : "house.fill")
     }
 
+    private var readinessSection: some View {
+        PoojaSectionCard(title: "Ritual readiness", symbol: "checkmark.seal.fill") {
+            VStack(alignment: .leading, spacing: 12) {
+                ProgressView(value: readiness.requiredPreparationProgress)
+                    .tint(readiness.hasPreparedRequiredMaterials ? .green : theme.primary)
+                    .accessibilityLabel("Required material readiness")
+                    .accessibilityValue(readiness.materialStatus)
+
+                readinessRow(
+                    title: "Materials",
+                    detail: readiness.materialStatus,
+                    symbol: readiness.hasPreparedRequiredMaterials ? "checkmark.circle.fill" : "circle.dotted",
+                    color: readiness.hasPreparedRequiredMaterials ? .green : theme.primary
+                )
+                readinessRow(
+                    title: "Practice boundary",
+                    detail: readiness.practiceStatus,
+                    symbol: vidhi.practiceLevel == .priestRecommended ? "person.badge.shield.checkmark.fill" : "house.fill",
+                    color: vidhi.practiceLevel == .priestRecommended ? .orange : theme.tertiary
+                )
+                readinessRow(
+                    title: "Provenance",
+                    detail: readiness.sourceStatus,
+                    symbol: "books.vertical.fill",
+                    color: theme.secondary
+                )
+            }
+        }
+    }
+
+    private func readinessRow(title: String, detail: String, symbol: String, color: Color) -> some View {
+        HStack(alignment: .top, spacing: 11) {
+            Image(systemName: symbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(color)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(theme.semanticPrimaryText)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(theme.semanticSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
     private var practiceBoundary: some View {
         CosmicGlassCard(cornerRadius: 18) {
             HStack(alignment: .top, spacing: 12) {
@@ -344,8 +424,16 @@ struct PoojaVidhiDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 ProgressView(value: preparationProgress)
                     .tint(theme.primary)
-                    .accessibilityLabel("Materials prepared")
-                    .accessibilityValue("\(preparedMaterialIDs.count) of \(vidhi.materials.count)")
+                    .accessibilityLabel("Required materials prepared")
+                    .accessibilityValue(readiness.materialStatus)
+
+                HStack {
+                    Text("Required \(readiness.preparedRequiredMaterialCount)/\(readiness.requiredMaterialCount)")
+                    Spacer()
+                    Text("Optional \(readiness.preparedOptionalMaterialCount)/\(readiness.optionalMaterialCount)")
+                }
+                .font(.caption2.monospacedDigit().weight(.semibold))
+                .foregroundStyle(theme.semanticTertiaryText)
 
                 ForEach(vidhi.materials) { material in
                     Button {
@@ -521,7 +609,7 @@ struct GuidedPoojaView: View {
 
     var body: some View {
         ZStack {
-            CosmicStarfieldBackground()
+            RitualSanctuaryBackground()
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 18) {
@@ -582,8 +670,39 @@ struct GuidedPoojaView: View {
                     .tint(theme.primary)
                     .accessibilityLabel("Pooja progress")
                     .accessibilityValue(isComplete ? "Complete" : "Step \(currentStep.number) of \(vidhi.steps.count)")
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 7) {
+                        guidedBoundaryLabel
+                        Spacer(minLength: 6)
+                        guidedSourceLabelView
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        guidedBoundaryLabel
+                        guidedSourceLabelView
+                    }
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(theme.semanticSecondaryText)
+                .accessibilityElement(children: .combine)
             }
         }
+    }
+
+    private var guidedSourceLabel: String {
+        let noun = vidhi.sourceNotes.count == 1 ? "source" : "sources"
+        return "\(vidhi.sourceNotes.count) \(noun)"
+    }
+
+    private var guidedBoundaryLabel: some View {
+        Label(
+            vidhi.practiceLevel == .priestRecommended ? "Practitioner-led boundary" : "Household adaptation",
+            systemImage: vidhi.practiceLevel == .priestRecommended ? "person.badge.shield.checkmark.fill" : "house.fill"
+        )
+    }
+
+    private var guidedSourceLabelView: some View {
+        Label(guidedSourceLabel, systemImage: "books.vertical.fill")
     }
 
     private var currentStepCard: some View {
@@ -852,7 +971,7 @@ private extension PoojaCategory {
 #Preview("Pooja library") {
     NavigationStack {
         ZStack {
-            CosmicStarfieldBackground()
+            RitualSanctuaryBackground()
             PoojaVidhiLibraryView()
         }
         .navigationTitle("Pooja")
