@@ -681,6 +681,7 @@ struct RitualDestinationDescriptor: Equatable, Sendable {
         RitualDestinationDescriptor(title: "Panchang", symbol: "eye.fill"),
         RitualDestinationDescriptor(title: "Timing", symbol: "clock.fill"),
         RitualDestinationDescriptor(title: "Muhurtas", symbol: "clock.badge.checkmark.fill"),
+        RitualDestinationDescriptor(title: "Pooja", symbol: "hands.and.sparkles.fill"),
         RitualDestinationDescriptor(title: "Calendar", symbol: "calendar")
     ]
 }

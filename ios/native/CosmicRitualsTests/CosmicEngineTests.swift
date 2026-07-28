@@ -516,9 +516,91 @@ final class CosmicEngineTests: XCTestCase {
         XCTAssertTrue(RitualResponsiveLayout.usesIconOnlyDestinations(for: .accessibility2))
 
         let titles = RitualDestinationDescriptor.all.map(\.title)
-        XCTAssertEqual(titles, ["Panchang", "Timing", "Muhurtas", "Calendar"])
-        XCTAssertEqual(Set(titles).count, 4)
+        XCTAssertEqual(titles, ["Panchang", "Timing", "Muhurtas", "Pooja", "Calendar"])
+        XCTAssertEqual(Set(titles).count, 5)
         XCTAssertTrue(RitualDestinationDescriptor.all.allSatisfy { !$0.symbol.isEmpty })
+    }
+
+    func testPoojaVidhiCatalogIsStructuredCompleteAndTraceable() {
+        XCTAssertGreaterThanOrEqual(PoojaVidhiCatalog.all.count, 12)
+        XCTAssertEqual(PoojaVidhiCatalog.validationIssues, [])
+
+        for vidhi in PoojaVidhiCatalog.all {
+            XCTAssertFalse(vidhi.summary.isEmpty, vidhi.id)
+            XCTAssertFalse(vidhi.traditionNote.isEmpty, vidhi.id)
+            XCTAssertFalse(vidhi.sourceNotes.isEmpty, vidhi.id)
+            XCTAssertTrue(vidhi.sourceNotes.allSatisfy { $0.urlString.hasPrefix("https://") }, vidhi.id)
+            XCTAssertGreaterThanOrEqual(vidhi.durationMinutes.lowerBound, 5, vidhi.id)
+            XCTAssertLessThanOrEqual(vidhi.durationMinutes.lowerBound, vidhi.durationMinutes.upperBound, vidhi.id)
+        }
+    }
+
+    func testSimpleHouseholdPoojasIncludeUnderstandablePublicMantras() {
+        let householdVidhis = PoojaVidhiCatalog.all.filter { $0.practiceLevel == .simpleHousehold }
+        XCTAssertFalse(householdVidhis.isEmpty)
+
+        for vidhi in householdVidhis {
+            let mantras = vidhi.steps.compactMap(\.mantra)
+            XCTAssertFalse(mantras.isEmpty, vidhi.id)
+            XCTAssertTrue(mantras.allSatisfy {
+                !$0.devanagari.isEmpty && !$0.transliteration.isEmpty && !$0.meaning.isEmpty
+            }, vidhi.id)
+        }
+    }
+
+    func testPoojaSearchCoversPanditGPTPublicStarterPillars() {
+        XCTAssertEqual(PoojaVidhiCatalog.search("Lakshmi at home").first?.id, "lakshmi-home")
+        XCTAssertEqual(PoojaVidhiCatalog.search("Griha Pravesh").first?.id, "griha-pravesh")
+        XCTAssertTrue(PoojaVidhiCatalog.search("Navratri").contains { $0.id == "durga-navratri-home" })
+        XCTAssertTrue(PoojaVidhiCatalog.search("mantra meaning").allSatisfy {
+            $0.steps.contains { $0.mantra != nil }
+        })
+        XCTAssertTrue(PoojaVidhiCatalog.search("planetary", category: .planetary).allSatisfy {
+            $0.category == .planetary
+        })
+    }
+
+    func testSubscriptionPolicyRecognizesOnlyConfiguredProductsAndSecureLegalLinks() {
+        XCTAssertEqual(Set(SubscriptionCatalog.productIDs).count, 2)
+        XCTAssertTrue(SubscriptionCatalog.productIDs.allSatisfy {
+            $0.hasPrefix("com.cosmic.rituals.premium.")
+        })
+        XCTAssertEqual(SubscriptionCatalog.requestedTrialDays, 14)
+        XCTAssertFalse(SubscriptionEntitlementChecker.grantsAccess(activeProductIDs: []))
+        XCTAssertFalse(SubscriptionEntitlementChecker.grantsAccess(activeProductIDs: ["unrelated.product"]))
+        XCTAssertTrue(SubscriptionEntitlementChecker.grantsAccess(
+            activeProductIDs: [SubscriptionCatalog.annualProductID]
+        ))
+        XCTAssertTrue([
+            SubscriptionCatalog.privacyPolicyURL,
+            SubscriptionCatalog.termsOfUseURL,
+            SubscriptionCatalog.supportURL,
+            SubscriptionCatalog.manageSubscriptionsURL
+        ].allSatisfy { $0.scheme == "https" })
+    }
+
+    func testStoreKitConfigurationDeclaresTwoWeekTrialsForEveryProduct() throws {
+        let nativeRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let url = nativeRoot.appendingPathComponent("StoreKit/CosmicRituals.storekit")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        let data = try Data(contentsOf: url)
+        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let groups = try XCTUnwrap(root["subscriptionGroups"] as? [[String: Any]])
+        let subscriptions = groups.flatMap { $0["subscriptions"] as? [[String: Any]] ?? [] }
+
+        XCTAssertEqual(Set(subscriptions.compactMap { $0["productID"] as? String }), Set(SubscriptionCatalog.productIDs))
+        XCTAssertEqual(Set(subscriptions.compactMap { $0["recurringSubscriptionPeriod"] as? String }), ["P1M", "P1Y"])
+
+        for subscription in subscriptions {
+            let productID = try XCTUnwrap(subscription["productID"] as? String)
+            let offers = try XCTUnwrap(subscription["introductoryOffers"] as? [[String: Any]], productID)
+            let offer = try XCTUnwrap(offers.first, productID)
+            XCTAssertEqual(offer["paymentMode"] as? String, "free", productID)
+            XCTAssertEqual(offer["subscriptionPeriod"] as? String, "P2W", productID)
+            XCTAssertEqual(offer["numberOfPeriods"] as? Int, 1, productID)
+        }
     }
 
     func testAccessibilityLargeLocationMetadataKeepsFullTimeZone() {
@@ -678,6 +760,70 @@ final class CosmicEngineTests: XCTestCase {
         let reasons = try XCTUnwrap(userDefaults["NSPrivacyAccessedAPITypeReasons"] as? [String])
 
         XCTAssertEqual(reasons, ["CA92.1"])
+    }
+
+    @MainActor
+    func testPoojaPrimaryScreensRenderAtPhoneAndAccessibilitySizes() async {
+        let library = NavigationStack {
+            ZStack {
+                CosmicStarfieldBackground()
+                PoojaVidhiLibraryView()
+            }
+            .navigationTitle("Pooja")
+        }
+        .environment(\.cosmicTheme, CosmicColorScheme.obsidianGold)
+        .preferredColorScheme(.dark)
+
+        let detail = NavigationStack {
+            PoojaVidhiDetailView(vidhi: PoojaVidhiCatalog.all[2])
+        }
+        .environment(\.cosmicTheme, CosmicColorScheme.obsidianGold)
+        .preferredColorScheme(.dark)
+
+        let guided = NavigationStack {
+            GuidedPoojaView(vidhi: PoojaVidhiCatalog.all[1])
+        }
+        .environment(\.cosmicTheme, CosmicColorScheme.cloudDancer)
+        .environment(\.dynamicTypeSize, .accessibility2)
+        .preferredColorScheme(.light)
+
+        await attachSnapshot(library, name: "Pooja Library")
+        await attachSnapshot(detail, name: "Lakshmi Vidhi Detail")
+        await attachSnapshot(guided, name: "Guided Pooja Accessibility Text")
+    }
+
+    @MainActor
+    private func attachSnapshot<Content: View>(_ content: Content, name: String) async {
+        let size = CGSize(width: 390, height: 844)
+        let controller = UIHostingController(rootView: content)
+        guard let windowScene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
+            XCTFail("A window scene is required for the rendering contract")
+            return
+        }
+        let window = UIWindow(windowScene: windowScene)
+        window.frame = CGRect(origin: .zero, size: size)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        controller.beginAppearanceTransition(true, animated: false)
+        controller.endAppearanceTransition()
+        controller.view.frame = window.bounds
+        controller.view.setNeedsLayout()
+        controller.view.layoutIfNeeded()
+        await Task.yield()
+        try? await Task.sleep(nanoseconds: 150_000_000)
+        controller.view.setNeedsLayout()
+        controller.view.layoutIfNeeded()
+
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let image = renderer.image { _ in
+            controller.view.drawHierarchy(in: controller.view.bounds, afterScreenUpdates: true)
+        }
+        XCTAssertEqual(image.size, size)
+        let attachment = XCTAttachment(image: image)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        window.isHidden = true
     }
 
     private func contrast(_ foreground: Color, over background: Color) -> Double {

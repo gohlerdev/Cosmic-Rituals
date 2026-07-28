@@ -4,7 +4,6 @@ struct PanchangView: View {
     @State private var selectedDate = Date()
     @State private var panchangSnapshot: (context: CalculationContext, value: Panchang)?
     @State private var muhurtas: [Muhurta] = []
-    @State private var selectedTab = 0
     @State private var detailMuhurta: Muhurta?
     @State private var sunriseSunset: (Date, Date)?
     @State private var choghadiya: [Choghadiya] = []
@@ -18,6 +17,7 @@ struct PanchangView: View {
     @State private var panchangPDF: PanchangPDF? = nil
     @State private var now = Date()   // ticked every minute to drive live "NOW" indicators
     @StateObject private var locationManager = LocationManager()
+    @AppStorage("ritualSelectedDestination") private var selectedTab = 0
     @AppStorage("cosmicThemeVariant") private var variantRaw = CosmicThemeVariant.cosmicDark.rawValue
     @AppStorage("ritualExperienceMode") private var experienceRaw = RitualExperienceMode.ritualNow.rawValue
     @Environment(\.cosmicTheme) private var theme
@@ -28,8 +28,10 @@ struct PanchangView: View {
             ZStack {
                 CosmicStarfieldBackground()
                 VStack(spacing: 0) {
-                    LocationContextBar(manager: locationManager) {
-                        showLocationPicker = true
+                    if selectedTab != 3 {
+                        LocationContextBar(manager: locationManager) {
+                            showLocationPicker = true
+                        }
                     }
                     if selectedTab == 0 {
                         panchangScrollView
@@ -41,35 +43,39 @@ struct PanchangView: View {
                         }
                     } else if selectedTab == 2 {
                         muhurtaScrollView
+                    } else if selectedTab == 3 {
+                        PoojaVidhiLibraryView()
                     } else {
                         MonthlyCalendarView(selectedDate: $selectedDate, calculationContext: calculationContext)
                     }
                 }
             }
-            .navigationTitle(["Panchang", "Timing", "Muhurtas", "Calendar"][selectedTab.clamped(to: 0...3)])
+            .navigationTitle(RitualDestinationDescriptor.all[selectedTab.clamped(to: 0...(RitualDestinationDescriptor.all.count - 1))].title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 14) {
-                        ShareLink(item: panchangSummary,
-                                  subject: Text("Panchang for \(selectedDate.ritualDate(template: "yMd", in: calculationContext.timeZone))")) {
-                            Image(systemName: "square.and.arrow.up")
-                        }
-                        .accessibilityLabel("Share Panchang summary")
-                        .accessibilityHint("Opens the system share sheet")
-                        Group {
-                            if let pdf = panchangPDF {
-                                ShareLink(item: pdf, preview: SharePreview("Panchang PDF",
-                                          image: Image(systemName: "doc.richtext.fill"))) {
-                                    Image(systemName: "doc.richtext.fill")
-                                        .foregroundStyle(theme.primary)
+                        if selectedTab != 3 {
+                            ShareLink(item: panchangSummary,
+                                      subject: Text("Panchang for \(selectedDate.ritualDate(template: "yMd", in: calculationContext.timeZone))")) {
+                                Image(systemName: "square.and.arrow.up")
+                            }
+                            .accessibilityLabel("Share Panchang summary")
+                            .accessibilityHint("Opens the system share sheet")
+                            Group {
+                                if let pdf = panchangPDF {
+                                    ShareLink(item: pdf, preview: SharePreview("Panchang PDF",
+                                              image: Image(systemName: "doc.richtext.fill"))) {
+                                        Image(systemName: "doc.richtext.fill")
+                                            .foregroundStyle(theme.primary)
+                                    }
+                                    .accessibilityLabel("Share Panchang PDF")
+                                    .accessibilityHint("Opens the system share sheet with the generated PDF")
+                                } else {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .accessibilityLabel("Preparing Panchang PDF")
                                 }
-                                .accessibilityLabel("Share Panchang PDF")
-                                .accessibilityHint("Opens the system share sheet with the generated PDF")
-                            } else {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .accessibilityLabel("Preparing Panchang PDF")
                             }
                         }
                         Button { showThemePicker = true } label: {
@@ -80,14 +86,16 @@ struct PanchangView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { showLocationPicker = true } label: {
-                        Image(systemName: locationManager.activeLocation.source == .current
-                              ? "location.fill" : "mappin.and.ellipse")
-                            .foregroundStyle(locationManager.activeLocation.source == .current ? theme.primary : .secondary)
+                    if selectedTab != 3 {
+                        Button { showLocationPicker = true } label: {
+                            Image(systemName: locationManager.activeLocation.source == .current
+                                  ? "location.fill" : "mappin.and.ellipse")
+                                .foregroundStyle(locationManager.activeLocation.source == .current ? theme.primary : .secondary)
+                        }
+                        .accessibilityLabel("Calculation location")
+                        .accessibilityValue(locationManager.activeLocation.name)
+                        .accessibilityHint("Choose current location or an offline city")
                     }
-                    .accessibilityLabel("Calculation location")
-                    .accessibilityValue(locationManager.activeLocation.name)
-                    .accessibilityHint("Choose current location or an offline city")
                 }
             }
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
@@ -124,6 +132,9 @@ struct PanchangView: View {
             }
         }
         .onAppear {
+            if !RitualDestinationDescriptor.all.indices.contains(selectedTab) {
+                selectedTab = 0
+            }
             recompute()
             Task {
                 await NotificationManager.shared.clearPendingRitualNotifications()
@@ -922,6 +933,27 @@ private struct ThemePickerSheet: View {
                             Link("GeoNames · CC BY 4.0", destination: URL(string: "https://www.geonames.org/")!)
                                 .font(.caption)
                         }
+                        .padding(.horizontal)
+
+                        Divider().overlay(theme.semanticDivider).padding(.horizontal)
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Subscription & Support")
+                                .font(.caption.bold())
+                                .foregroundStyle(theme.semanticSecondaryText)
+                            Link(destination: SubscriptionCatalog.manageSubscriptionsURL) {
+                                Label("Manage subscription", systemImage: "creditcard.fill")
+                            }
+                            Link(destination: SubscriptionCatalog.privacyPolicyURL) {
+                                Label("Privacy policy", systemImage: "hand.raised.fill")
+                            }
+                            Link(destination: SubscriptionCatalog.termsOfUseURL) {
+                                Label("Terms of use", systemImage: "doc.text.fill")
+                            }
+                            Link(destination: SubscriptionCatalog.supportURL) {
+                                Label("Support", systemImage: "questionmark.circle.fill")
+                            }
+                        }
+                        .font(.caption)
                         .padding(.horizontal)
                         .padding(.bottom, 24)
                     }

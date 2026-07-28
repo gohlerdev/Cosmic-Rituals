@@ -34,6 +34,10 @@ struct CurrentMuhurtaIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some ReturnsValue<String> & ProvidesDialog {
+        guard await SubscriptionEntitlementChecker.grantsCurrentAccess() else {
+            let reply = "Open Cosmic Rituals to start or restore Premium before using this shortcut."
+            return .result(value: reply, dialog: IntentDialog(stringLiteral: reply))
+        }
         guard let (context, location) = IntentCalculationContext.resolve(for: Date()) else {
             let reply = "Open Cosmic Rituals and choose a calculation location before using this shortcut."
             return .result(value: reply, dialog: IntentDialog(stringLiteral: reply))
@@ -61,6 +65,10 @@ struct TodayPanchangIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some ReturnsValue<String> & ProvidesDialog {
+        guard await SubscriptionEntitlementChecker.grantsCurrentAccess() else {
+            let reply = "Open Cosmic Rituals to start or restore Premium before using this shortcut."
+            return .result(value: reply, dialog: IntentDialog(stringLiteral: reply))
+        }
         guard let (context, location) = IntentCalculationContext.resolve(for: Date()) else {
             let reply = "Open Cosmic Rituals and choose a calculation location before using this shortcut."
             return .result(value: reply, dialog: IntentDialog(stringLiteral: reply))
@@ -82,6 +90,10 @@ struct NextAuspiciousTimeIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some ReturnsValue<String> & ProvidesDialog {
+        guard await SubscriptionEntitlementChecker.grantsCurrentAccess() else {
+            let reply = "Open Cosmic Rituals to start or restore Premium before using this shortcut."
+            return .result(value: reply, dialog: IntentDialog(stringLiteral: reply))
+        }
         let now = Date()
         guard let (context, location) = IntentCalculationContext.resolve(for: now) else {
             let reply = "Open Cosmic Rituals and choose a calculation location before using this shortcut."

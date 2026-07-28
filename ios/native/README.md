@@ -16,6 +16,15 @@ cosmic-glass look and its sidereal (Lahiri ayanamsha) ephemeris.
   classical auspiciousness (Excellent / Auspicious / Mixed / Avoid), with the **current**
   muhurta highlighted live against the clock.
 - **Auspicious & inauspicious kala** — Rahu Kala and Yamaganda for the weekday.
+- **12 offline Pooja Vidhis** — searchable daily, deity, festival, vrata, life-event,
+  and planetary guides with materials, preparation, ordered steps, Devanagari,
+  transliteration, mantra meaning, safety, respectful closure, and guided mode.
+- **Tradition-aware ritual boundaries** — household guides are separated from
+  priest-recommended rites; initiatory mantras, homa instructions, and universalized
+  claims are intentionally excluded.
+- **StoreKit 2 Premium access** — verified App Store entitlements, transaction updates,
+  restore purchases, localized subscription UI, and eligible 14-day introductory
+  trials. No local trial timer or unverified receipt fallback.
 
 ## Build & run
 
@@ -30,13 +39,19 @@ iOS 26 simulator or device.
 ```
 CosmicRituals/
 ├── App/        @main entry → RootView
-├── Engine/     pure-Foundation Panchang ephemeris + models
+├── Engine/     pure-Foundation Panchang ephemeris + Pooja catalog/models
 ├── Theme/      shared cosmic-glass theme & components
 └── Views/      RootView + PanchangView
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the engine details and exactly what was
 imported from the parent Cosmic Astrology app.
+
+See [POOJA_CONTENT.md](POOJA_CONTENT.md) for the ritual-content contract, source
+provenance, inclusion policy, and the household/priest boundary.
+
+See [SUBSCRIPTION_RELEASE.md](SUBSCRIPTION_RELEASE.md) for product identifiers,
+entitlement behavior, App Store Connect setup, policy URLs, and the sandbox test matrix.
 
 ## Accuracy and integrity
 

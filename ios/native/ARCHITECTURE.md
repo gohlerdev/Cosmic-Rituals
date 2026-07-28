@@ -13,12 +13,14 @@ CosmicRituals/
 ├── Engine/                         ← pure Foundation, no SwiftUI
 │   ├── PanchangModels.swift        ZodiacSign, Panchang, NakshatraResult, Muhurta(+Quality), CelestialBody
 │   ├── CosmicEngine.swift          Panchang-focused ephemeris (sidereal, Lahiri ayanamsha)
-│   └── MuhurtaLibrary.swift        rich per-muhurta detail: deity, resonance, favourable/avoid
+│   ├── MuhurtaLibrary.swift        rich per-muhurta detail: deity, resonance, favourable/avoid
+│   └── PoojaVidhiCatalog.swift     offline ritual models, search, validation, content policy
 ├── Theme/
 │   └── CosmicTheme.swift           shared cosmic-glass palette + reusable components
 └── Views/
     ├── RootView.swift              hosts PanchangView in the cosmic theme
     ├── PanchangView.swift          Five Limbs + 30 Muhurtas, with live "now" timing
+    ├── PoojaVidhiViews.swift       library, material checklist, detail + guided ritual flow
     └── MuhurtaDetailView.swift     tap-through sheet: deity, description, favourable/avoid
 ```
 
@@ -65,6 +67,24 @@ selectedDate + RitualLocation ──▶ CalculationContext
                                       ├─▶ solar / kala / choghadiya / hora schedules
                                       └─▶ 30 day + night muhurtas
 ```
+
+Pooja guidance is deliberately independent of the ephemeris. `PoojaVidhiCatalog` is
+pure Foundation data with deterministic search and executable validation.
+`PoojaVidhiLibraryView` renders that catalog, while `PoojaVidhiDetailView` and
+`GuidedPoojaView` own only ephemeral checklist/progress state. No ritual completion,
+search text, or religious preference leaves the device.
+
+The catalog distinguishes `simpleHousehold`, `extendedHousehold`, and
+`priestRecommended` practice. Formal homa, nyasa, kalasha installation, visarjana,
+initiatory mantras, and supposedly universal priestly procedures are never synthesized.
+See [POOJA_CONTENT.md](POOJA_CONTENT.md).
+
+Premium access is owned by `SubscriptionStore`. It accepts only verified current
+StoreKit entitlements for the configured monthly or annual product, observes transaction
+updates, and preserves access when product merchandising metadata is temporarily
+unavailable. `RootView` owns this app-level service and selects the Premium gate or the
+main Panchang experience. App Intents check the same StoreKit entitlement boundary.
+Trial eligibility and localized prices come from App Store Connect, never device time.
 
 ## The engine
 
