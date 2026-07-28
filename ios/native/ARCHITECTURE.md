@@ -45,20 +45,25 @@ brought over:
 - **`PanchangModels.swift`** is the *Panchang slice* of the parent `AstroModel.swift` —
   only the value types the Panchang screen touches. `CelestialBody` is retained because a
   nakshatra reports its (dasha) lord.
-- **`CosmicTheme.swift`** is the shared theme/component library, copied verbatim so the
-  app looks identical to its siblings.
-- **`PanchangView.swift`** is copied verbatim from the parent.
+- **`CosmicTheme.swift`** began from the shared theme/component library and now carries
+  app-specific semantic colors, responsive navigation, and motion safeguards.
+- **`PanchangView.swift`** began from the parent surface and is now independently
+  maintained around the location-aware calculation contract described below.
 
 ## Data flow
 
-`RootView` hosts `PanchangView`, which owns a `selectedDate` and a sub-tab selection
-(Five Limbs / 30 Muhurtas). On appear and on any date change it asks the engine for the
-day's facts — the computation is cheap and side-effect-free, so there is no view model
-or persistence.
+`RootView` hosts `PanchangView`, which owns a selected civil date, destination,
+persisted experience/theme preferences, and a `LocationManager`. A
+`CalculationContext` binds that date to explicit coordinates and an IANA time zone.
+The daily Panchang snapshot is cached with its context so SwiftUI updates never show
+values from a previous location while recomputation is in flight.
 
 ```
-selectedDate ──▶ CosmicEngine.getPanchang(date:)  ──▶ Five Limbs section
-             └─▶ CosmicEngine.getMuhurtas(date:)  ──▶ 30 Muhurtas section (live "now")
+selectedDate + RitualLocation ──▶ CalculationContext
+                                      ├─▶ sunrise-anchored five limbs
+                                      ├─▶ four independent transition solves
+                                      ├─▶ solar / kala / choghadiya / hora schedules
+                                      └─▶ 30 day + night muhurtas
 ```
 
 ## The engine
@@ -67,12 +72,15 @@ selectedDate ──▶ CosmicEngine.getPanchang(date:)  ──▶ Five Limbs sec
 ayanamsha and Meeus algorithms (Sun §25, Moon §47 47-term series). `getPanchang` derives
 the five limbs from the Sun/Moon sidereal longitudes: **tithi** (12° elongation steps),
 **nakshatra** (Moon's 13°20′ segment + pada), **yoga** (Sun+Moon), **karana** (half-tithi),
-and **vara** (weekday). `getMuhurtas` divides the local day/night (from NOAA sunrise/sunset)
-into 15 + 15 named windows, each tagged with its classical auspiciousness and marked
-`isCurrent` against the clock.
+and **vara** (weekday). Each changing limb has a separately solved next boundary.
+`getMuhurtas` divides the local day/night (from NOAA sunrise/sunset) into 15 + 15
+named windows, each tagged with its classical auspiciousness and marked `isCurrent`
+against the clock. See [ACCURACY.md](ACCURACY.md) for the calculation contract,
+fixtures, tolerances, and quarantined prototypes.
 
-> Muhurta timings use a Delhi default location (28.61° N, 77.21° E). For other locations,
-> pass `latDeg`/`lonDeg` to `getMuhurtas`.
+> New Delhi is the visible first-run default, not a hidden calculation fallback.
+> Once the user chooses a city or current location, every daily calculation, export,
+> and App Intent uses that explicit saved context.
 
 ## Theme
 

@@ -1,25 +1,29 @@
 # Cosmic Rituals — Native iOS handoff
 
-This `ios/` section is an additive, self-contained snapshot of the completed native SwiftUI application. The GitHub repository was empty when cloned; its remote and new local history remain intact.
+This `ios/` section is the canonical, self-contained native SwiftUI application.
+It began as a sanitized handoff from the development checkout and now carries its
+own tested accuracy and product-integrity improvements.
 
 ## Layout
 
-- `native/` — exact sanitized snapshot of the live Xcode project
-- `evidence/` — selected final simulator screenshots
+- `native/` — working Xcode project, tests, and product documentation
+- `evidence/` — historical handoff screenshots (not current QA evidence)
 
 ## Current product state
 
 - Native SwiftUI application targeting iOS 26
 - Six selectable light/dark visual themes with Liquid Glass surfaces and motion polish
-- Ritual-now guidance, Panchang/five-limb context, Vedic ledger, location support, and saved preferences
+- Sunrise-anchored Panchang, four limb transitions, three experience layouts,
+  location-aware timing, saved preferences, and calculation-integrity disclosure
 - Privacy manifest, city data, tests, and app icon assets included
 - `CosmicWidgets/` source is preserved, but it is not currently wired as an Xcode widget target and must not be presented as shipping functionality
 
-## Verification already completed
+## Historical release state
 
-- Simulator design and experience QA completed on iPhone 17 / iOS 26.5
-- Native project and unit-test target are included under `native/`
-- TestFlight: version 1.0, build 3 uploaded successfully; archive/build products are intentionally excluded from source control
+- The imported handoff had simulator design QA on iPhone 17 / iOS 26.5.
+- TestFlight version 1.0 build 3 was uploaded from the earlier development checkout.
+- Those facts do not prove that the current source is release-ready; rerun the
+  build, tests, and simulator QA below for every change.
 
 ## Build and test
 
@@ -41,11 +45,13 @@ xcodebuild \
   test
 ```
 
-## Snapshot provenance
+## Initial-import provenance
 
 - Copied read-only from `/Users/psy/Documents/Gohler/Cosmic-Rituals`
 - Snapshot date: 2026-07-26
 - Included source files: 41
-- Aggregate relative-path/content SHA-256: `80bab676abbf21a77da200b60ab534e37318af6dfe6f018d099dd7a679430495`
+- Original aggregate relative-path/content SHA-256: `80bab676abbf21a77da200b60ab534e37318af6dfe6f018d099dd7a679430495`
 - Excluded: `.DS_Store`, user Xcode state, DerivedData, build products, archives, and signing material
 
+`SNAPSHOT.sha256` records that import only. It is intentionally not a checksum of
+the evolving canonical source tree.

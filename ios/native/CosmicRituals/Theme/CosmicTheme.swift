@@ -262,7 +262,10 @@ struct CosmicStarfieldBackground: View {
     }
 
     private var darkBackground: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 60 : nil, paused: reduceMotion)) { ctx in
+        // Twinkling is deliberately capped at 20 fps. The motion is extremely
+        // slow, so display-refresh rendering adds battery/GPU cost without a
+        // visible quality benefit. Reduce Motion freezes the canvas entirely.
+        TimelineView(.animation(minimumInterval: 1.0 / 20.0, paused: reduceMotion)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             Canvas { gfx, size in
                 // 1. Background gradient

@@ -58,6 +58,57 @@ struct ZodiacSign: Equatable {
     static func fromIndex(_ i: Int) -> ZodiacSign { all[((i % 12) + 12) % 12] }
 }
 
+// MARK: - Panchang Transitions
+
+enum PanchangLimbKind: String, CaseIterable, Codable, Sendable {
+    case tithi
+    case nakshatra
+    case yoga
+    case karana
+}
+
+/// The next exact boundary for one changing Panchang limb.
+///
+/// Daily labels alone are incomplete because a limb can change at any instant
+/// between one sunrise and the next. Keeping the current and next names beside
+/// the solved boundary makes the value self-describing for the app, exports,
+/// widgets, and accessibility output.
+struct PanchangTransition: Codable, Equatable, Sendable {
+    let kind: PanchangLimbKind
+    let currentName: String
+    let nextName: String
+    let endTime: Date
+}
+
+struct PanchangTransitions: Codable, Equatable, Sendable {
+    let tithi: PanchangTransition?
+    let nakshatra: PanchangTransition?
+    let yoga: PanchangTransition?
+    let karana: PanchangTransition?
+
+    static let unavailable = PanchangTransitions(
+        tithi: nil,
+        nakshatra: nil,
+        yoga: nil,
+        karana: nil
+    )
+
+    var chronological: [PanchangTransition] {
+        [tithi, nakshatra, yoga, karana]
+            .compactMap { $0 }
+            .sorted { $0.endTime < $1.endTime }
+    }
+
+    func transition(for kind: PanchangLimbKind) -> PanchangTransition? {
+        switch kind {
+        case .tithi: return tithi
+        case .nakshatra: return nakshatra
+        case .yoga: return yoga
+        case .karana: return karana
+        }
+    }
+}
+
 // MARK: - Panchang (Five Limbs of the Vedic Day)
 
 struct Panchang: Codable {
@@ -75,6 +126,7 @@ struct Panchang: Codable {
     let moonSignName: String
     let sunriseTime: Date?
     let sunsetTime: Date?
+    let transitions: PanchangTransitions
 
     static let tithiNames = [
         "Pratipada","Dvitiya","Tritiya","Chaturthi","Panchami",
@@ -104,6 +156,13 @@ struct Panchang: Codable {
         "Bava","Balava","Kaulava","Taitila","Garija","Vanija","Vishti",
         "Shakuni","Chatushpada","Naga","Kimstughna"
     ]
+
+    func referenceDisclosure(in timeZone: TimeZone) -> String {
+        if let sunriseTime {
+            return "Panchang day begins at sunrise · \(sunriseTime.ritualShortTime(in: timeZone)) local time"
+        }
+        return "Sunrise unavailable · sampled at \(date.ritualShortTime(in: timeZone)) local time"
+    }
 }
 
 // MARK: - Nakshatra Result

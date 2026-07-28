@@ -136,11 +136,10 @@ struct MonthlyCalendarView: View {
     private var legendCard: some View {
         CosmicGlassCard {
             VStack(alignment: .leading, spacing: 8) {
-                CosmicSectionHeader(title: "Quality Legend", icon: "circle.grid.2x2.fill")
+                CosmicSectionHeader(title: "Sunrise Snapshot Legend", icon: "circle.grid.2x2.fill")
                 HStack(spacing: 16) {
-                    legendItem(.green,  "Auspicious yoga")
-                    legendItem(.red,    "Inauspicious yoga")
-                    legendItem(.orange, "Mixed")
+                    legendItem(.green,  "Favourable yoga")
+                    legendItem(.red,    "Caution yoga")
                 }
                 HStack(spacing: 16) {
                     legendItem(.purple, "Purnima / Ekadashi")
@@ -187,7 +186,9 @@ struct MonthlyCalendarView: View {
                 longitude: calculationContext.longitude,
                 timeZoneIdentifier: calculationContext.timeZoneIdentifier
             )
-            cache[key] = CosmicEngine.getPanchang(context: context)
+            // Month cells need the sunrise snapshot, not four sub-second boundary
+            // solves per day. Detailed transitions are computed only on the daily view.
+            cache[key] = CosmicEngine.getPanchang(context: context, includeTransitions: false)
         }
         panchangCache = cache
     }
@@ -250,7 +251,7 @@ private struct DayCell: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(date.ritualCompleteDate(in: calendar.timeZone))
-        .accessibilityValue("\(panchang?.tithiName ?? "Panchang unavailable"), \(yogaDetail.isAuspicious ? "auspicious" : "caution")")
+        .accessibilityValue("At sunrise, \(panchang?.tithiName ?? "Panchang unavailable"), \(yogaDetail.isAuspicious ? "favourable yoga" : "caution yoga")")
     }
 
     private func shortTithi(_ idx: Int) -> String {

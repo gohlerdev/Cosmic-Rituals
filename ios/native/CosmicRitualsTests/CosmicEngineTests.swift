@@ -96,6 +96,77 @@ final class CosmicEngineTests: XCTestCase {
         XCTAssertTrue(CosmicEngine.getChoghadiya(context: svalbard).isEmpty)
         XCTAssertTrue(CosmicEngine.getHora(context: svalbard).isEmpty)
         XCTAssertTrue(CosmicEngine.getDurMuhurta(context: svalbard).isEmpty)
+        XCTAssertNil(CosmicEngine.getRahuKala(context: svalbard))
+        XCTAssertNil(CosmicEngine.getYamaganda(context: svalbard))
+        XCTAssertNil(CosmicEngine.getGulikaKala(context: svalbard))
+    }
+
+    func testPublishedFridayDurMuhurtaUsesFourthAndNinthDaySegments() throws {
+        // Drik Panchang, Mumbai, 2026-07-24: 08:49–09:42 and 13:11–14:03.
+        let mumbai = context(2026, 7, 24, latitude: 19.0760, longitude: 72.8777, timeZone: "Asia/Kolkata")
+        let periods = CosmicEngine.getDurMuhurta(context: mumbai)
+        XCTAssertEqual(periods.count, 2)
+        try assertLocalInterval(periods[0], startHour: 8, startMinute: 49, endHour: 9, endMinute: 42,
+                                context: mumbai, toleranceMinutes: 12)
+        try assertLocalInterval(periods[1], startHour: 13, startMinute: 11, endHour: 14, endMinute: 3,
+                                context: mumbai, toleranceMinutes: 12)
+    }
+
+    func testPublishedFridayRahuYamagandaAndGulikaKalas() throws {
+        // Drik Panchang, Mumbai, 2026-07-24: Rahu 11:07–12:45,
+        // Yamaganda 16:01–17:39, and Gulika 07:51–09:29.
+        let mumbai = context(2026, 7, 24, latitude: 19.0760, longitude: 72.8777, timeZone: "Asia/Kolkata")
+        let rahu = try XCTUnwrap(CosmicEngine.getRahuKala(context: mumbai))
+        let yamaganda = try XCTUnwrap(CosmicEngine.getYamaganda(context: mumbai))
+        let gulika = try XCTUnwrap(CosmicEngine.getGulikaKala(context: mumbai))
+
+        try assertLocalInterval(
+            (start: rahu.start, end: rahu.end, label: "Rahu Kala"),
+            startHour: 11, startMinute: 7, endHour: 12, endMinute: 45,
+            context: mumbai, toleranceMinutes: 12
+        )
+        try assertLocalInterval(
+            (start: yamaganda.start, end: yamaganda.end, label: "Yamaganda"),
+            startHour: 16, startMinute: 1, endHour: 17, endMinute: 39,
+            context: mumbai, toleranceMinutes: 12
+        )
+        try assertLocalInterval(
+            (start: gulika.start, end: gulika.end, label: "Gulika Kala"),
+            startHour: 7, startMinute: 51, endHour: 9, endMinute: 29,
+            context: mumbai, toleranceMinutes: 12
+        )
+    }
+
+    func testPublishedTuesdayDurMuhurtaIncludesNightPeriod() throws {
+        // Drik Panchang, Hyderabad, 2026-06-23: 08:21–09:14 and 23:14–23:57.
+        let hyderabad = context(2026, 6, 23, latitude: 17.3850, longitude: 78.4867, timeZone: "Asia/Kolkata")
+        let periods = CosmicEngine.getDurMuhurta(context: hyderabad)
+        XCTAssertEqual(periods.count, 2)
+        try assertLocalInterval(periods[0], startHour: 8, startMinute: 21, endHour: 9, endMinute: 14,
+                                context: hyderabad, toleranceMinutes: 12)
+        try assertLocalInterval(periods[1], startHour: 23, startMinute: 14, endHour: 23, endMinute: 57,
+                                context: hyderabad, toleranceMinutes: 12)
+    }
+
+    func testPublishedFridayAbhijitScalesWithTheLocalDay() throws {
+        // Drik Panchang, Mumbai, 2026-07-24: 12:19–13:11.
+        let mumbai = context(2026, 7, 24, latitude: 19.0760, longitude: 72.8777, timeZone: "Asia/Kolkata")
+        let period = try XCTUnwrap(CosmicEngine.getAbhijitMuhurta(context: mumbai))
+        try assertLocalInterval(
+            (start: period.start, end: period.end, label: "Abhijit"),
+            startHour: 12, startMinute: 19, endHour: 13, endMinute: 11,
+            context: mumbai, toleranceMinutes: 12
+        )
+    }
+
+    func testAbhijitIsNotPresentedAsAuspiciousOnWednesday() {
+        let bartlesville = context(
+            2026, 7, 22,
+            latitude: 36.7473,
+            longitude: -95.9808,
+            timeZone: "America/Chicago"
+        )
+        XCTAssertNil(CosmicEngine.getAbhijitMuhurta(context: bartlesville))
     }
 
     func testKaranaSequenceHasOneOpeningFixedKaranaAndThreeClosingFixedKaranas() {
@@ -149,6 +220,149 @@ final class CosmicEngineTests: XCTestCase {
     func testPanchangUsesContextWeekday() {
         let tokyo = context(2026, 7, 24, latitude: 35.6762, longitude: 139.6503, timeZone: "Asia/Tokyo")
         XCTAssertEqual(CosmicEngine.getPanchang(context: tokyo).weekdayName, "Friday")
+    }
+
+    func testDailyPanchangUsesLocalSunriseAndCarriesSolarTimes() throws {
+        let delhi = context(2026, 7, 24, latitude: 28.6139, longitude: 77.2090, timeZone: "Asia/Kolkata")
+        let solar = try XCTUnwrap(CosmicEngine.getSunriseSunset(context: delhi))
+        let panchang = CosmicEngine.getPanchang(context: delhi)
+
+        XCTAssertEqual(panchang.date.timeIntervalSince(solar.sunrise), 0, accuracy: 0.001)
+        XCTAssertEqual(panchang.sunriseTime, solar.sunrise)
+        XCTAssertEqual(panchang.sunsetTime, solar.sunset)
+        XCTAssertTrue(panchang.referenceDisclosure(in: delhi.timeZone).localizedCaseInsensitiveContains("sunrise"))
+    }
+
+    func testPublishedParisPanchangTransitionsStayWithinCivilTimeTolerance() throws {
+        // Independent reference: Drik Panchang for Paris, 2026-07-21.
+        // https://www.drikpanchang.com/ — published values: sunrise 06:10,
+        // Ashtami until 01:46 Jul 22, Chitra until 17:19, Siddha until 14:55,
+        // and Vishti until 13:04. We allow 12 minutes because the app's compact
+        // offline ephemeris intentionally omits the larger JPL/Swiss data files.
+        let paris = context(2026, 7, 21, latitude: 48.8566, longitude: 2.3522, timeZone: "Europe/Paris")
+        let panchang = CosmicEngine.getPanchang(context: paris)
+
+        XCTAssertEqual(panchang.tithiName, "Ashtami")
+        XCTAssertEqual(panchang.nakshatraName, "Chitra")
+        XCTAssertEqual(panchang.yogaName, "Siddha")
+        XCTAssertEqual(panchang.karanaName, "Vishti")
+
+        try assertLocalTransition(
+            panchang.transitions.tithi,
+            current: "Ashtami", next: "Navami",
+            year: 2026, month: 7, day: 22, hour: 1, minute: 46,
+            context: paris, toleranceMinutes: 12
+        )
+        try assertLocalTransition(
+            panchang.transitions.nakshatra,
+            current: "Chitra", next: "Swati",
+            year: 2026, month: 7, day: 21, hour: 17, minute: 19,
+            context: paris, toleranceMinutes: 12
+        )
+        try assertLocalTransition(
+            panchang.transitions.yoga,
+            current: "Siddha", next: "Sadhya",
+            year: 2026, month: 7, day: 21, hour: 14, minute: 55,
+            context: paris, toleranceMinutes: 12
+        )
+        try assertLocalTransition(
+            panchang.transitions.karana,
+            current: "Vishti", next: "Bava",
+            year: 2026, month: 7, day: 21, hour: 13, minute: 4,
+            context: paris, toleranceMinutes: 12
+        )
+    }
+
+    func testEverySolvedLimbBoundaryChangesToItsDeclaredNextValue() throws {
+        let contexts = [
+            context(2026, 1, 15, latitude: 28.6139, longitude: 77.2090, timeZone: "Asia/Kolkata"),
+            context(2026, 4, 9, latitude: -33.8688, longitude: 151.2093, timeZone: "Australia/Sydney"),
+            context(2026, 7, 21, latitude: 48.8566, longitude: 2.3522, timeZone: "Europe/Paris"),
+            context(2026, 11, 3, latitude: 37.4323, longitude: -121.8996, timeZone: "America/Los_Angeles"),
+        ]
+
+        for calculationContext in contexts {
+            let daily = CosmicEngine.getPanchang(context: calculationContext)
+            XCTAssertEqual(daily.transitions.chronological.count, PanchangLimbKind.allCases.count)
+
+            for transition in daily.transitions.chronological {
+                let before = CosmicEngine.getPanchang(
+                    date: transition.endTime.addingTimeInterval(-60),
+                    timezoneIdentifier: calculationContext.timeZoneIdentifier
+                )
+                let after = CosmicEngine.getPanchang(
+                    date: transition.endTime.addingTimeInterval(60),
+                    timezoneIdentifier: calculationContext.timeZoneIdentifier
+                )
+                XCTAssertEqual(
+                    limbName(transition.kind, in: before),
+                    transition.currentName,
+                    "\(calculationContext.timeZoneIdentifier) \(transition.kind.rawValue) before boundary"
+                )
+                XCTAssertEqual(
+                    limbName(transition.kind, in: after),
+                    transition.nextName,
+                    "\(calculationContext.timeZoneIdentifier) \(transition.kind.rawValue) after boundary"
+                )
+            }
+        }
+    }
+
+    func testPolarFallbackIsExplicitAndDoesNotInventSunrise() {
+        let svalbard = context(2026, 6, 21, latitude: 78.2232, longitude: 15.6469, timeZone: "Arctic/Longyearbyen")
+        let panchang = CosmicEngine.getPanchang(context: svalbard)
+
+        XCTAssertNil(panchang.sunriseTime)
+        XCTAssertNil(panchang.sunsetTime)
+        XCTAssertEqual(
+            svalbard.calendar.component(.hour, from: panchang.date),
+            CalculationContext.polarFallbackReferenceHour
+        )
+        XCTAssertTrue(panchang.referenceDisclosure(in: svalbard.timeZone).localizedCaseInsensitiveContains("unavailable"))
+    }
+
+    func testMonthCellSnapshotSkipsDetailedBoundaryWork() {
+        let delhi = context(2026, 7, 24, latitude: 28.6139, longitude: 77.2090, timeZone: "Asia/Kolkata")
+        let compact = CosmicEngine.getPanchang(context: delhi, includeTransitions: false)
+
+        XCTAssertTrue(compact.transitions.chronological.isEmpty)
+        XCTAssertNotNil(compact.sunriseTime)
+    }
+
+    func testNextDayTransitionLabelIncludesCivilDateAndSameDayLabelDoesNot() throws {
+        let paris = context(2026, 7, 21, latitude: 48.8566, longitude: 2.3522, timeZone: "Europe/Paris")
+        let panchang = CosmicEngine.getPanchang(context: paris)
+        let tithi = try XCTUnwrap(panchang.transitions.tithi)
+        let nakshatra = try XCTUnwrap(panchang.transitions.nakshatra)
+        let locale = Locale(identifier: "en_US_POSIX")
+
+        let nextDay = tithi.endTime.ritualTransitionLabel(
+            relativeTo: panchang.date,
+            in: paris.timeZone,
+            locale: locale
+        )
+        let sameDay = nakshatra.endTime.ritualTransitionLabel(
+            relativeTo: panchang.date,
+            in: paris.timeZone,
+            locale: locale
+        )
+
+        XCTAssertTrue(nextDay.contains("22"))
+        XCTAssertTrue(nextDay.contains("Jul"))
+        XCTAssertFalse(sameDay.contains("Jul"))
+    }
+
+    func testPanchangPDFExporterProducesAValidNonEmptyPDF() {
+        let delhi = context(2026, 7, 24, latitude: 28.6139, longitude: 77.2090, timeZone: "Asia/Kolkata")
+        let pdf = PanchangPDFExporter.generatePDF(context: delhi)
+
+        XCTAssertTrue(pdf.starts(with: Data("%PDF".utf8)))
+        XCTAssertGreaterThan(pdf.count, 5_000)
+
+        let renderedArtifact = XCTAttachment(data: pdf, uniformTypeIdentifier: "com.adobe.pdf")
+        renderedArtifact.name = "Cosmic-Rituals-Panchang-QA"
+        renderedArtifact.lifetime = .keepAlways
+        add(renderedArtifact)
     }
 
     func testCompleteOfflineCatalogCountAndGlobalSearch() throws {
@@ -287,12 +501,14 @@ final class CosmicEngineTests: XCTestCase {
         ))
     }
 
-    func testDailySnapshotNamingMatchesNoonReferenceSemantics() {
+    func testDailySnapshotNamingMatchesSunriseReferenceSemantics() throws {
         let delhi = context(2026, 7, 24, latitude: 28.6139, longitude: 77.2090, timeZone: "Asia/Kolkata")
-        XCTAssertEqual(delhi.calendar.component(.hour, from: delhi.localNoon), CalculationContext.dailySnapshotReferenceHour)
+        let panchang = CosmicEngine.getPanchang(context: delhi)
+        let sunrise = try XCTUnwrap(CosmicEngine.getSunriseSunset(context: delhi)?.sunrise)
+        XCTAssertEqual(panchang.date.timeIntervalSince(sunrise), 0, accuracy: 0.001)
         XCTAssertEqual(RitualExperienceMode.ritualNow.displayName, "Daily Snapshot")
-        XCTAssertTrue(RitualExperienceMode.ritualNow.summary.localizedCaseInsensitiveContains("noon"))
-        XCTAssertTrue(CalculationContext.dailySnapshotDisclosure.localizedCaseInsensitiveContains("12:00 PM"))
+        XCTAssertTrue(RitualExperienceMode.ritualNow.summary.localizedCaseInsensitiveContains("sunrise"))
+        XCTAssertTrue(panchang.referenceDisclosure(in: delhi.timeZone).localizedCaseInsensitiveContains("sunrise"))
     }
 
     func testAccessibilityLargeDestinationLayoutUsesIconsWithoutLosingLabels() {
@@ -354,6 +570,28 @@ final class CosmicEngineTests: XCTestCase {
                 .replacingOccurrences(of: "\u{202F}", with: " "),
             "1:30 PM"
         )
+    }
+
+    func testLocationChangePreservesTheSelectedCivilDayAcrossDateLineOffsets() throws {
+        var losAngelesCalendar = Calendar(identifier: .gregorian)
+        losAngelesCalendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let selected = try XCTUnwrap(losAngelesCalendar.date(from: DateComponents(
+            year: 2026, month: 7, day: 23, hour: 20, minute: 30
+        )))
+        let tokyo = try XCTUnwrap(TimeZone(identifier: "Asia/Tokyo"))
+
+        let translated = selected.ritualCivilDay(
+            preservingDateFrom: losAngelesCalendar.timeZone,
+            into: tokyo
+        )
+        var tokyoCalendar = Calendar(identifier: .gregorian)
+        tokyoCalendar.timeZone = tokyo
+        let components = tokyoCalendar.dateComponents([.year, .month, .day, .hour], from: translated)
+
+        XCTAssertEqual(components.year, 2026)
+        XCTAssertEqual(components.month, 7)
+        XCTAssertEqual(components.day, 23)
+        XCTAssertEqual(components.hour, 12)
     }
 
     func testOnlyOwnedNotificationIdentifiersAreCleared() {
@@ -498,5 +736,73 @@ final class CosmicEngineTests: XCTestCase {
             longitude: longitude,
             timeZoneIdentifier: timeZone
         )
+    }
+
+    private func assertLocalTransition(
+        _ transition: PanchangTransition?,
+        current: String,
+        next: String,
+        year: Int,
+        month: Int,
+        day: Int,
+        hour: Int,
+        minute: Int,
+        context: CalculationContext,
+        toleranceMinutes: Double,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let transition = try XCTUnwrap(transition, file: file, line: line)
+        XCTAssertEqual(transition.currentName, current, file: file, line: line)
+        XCTAssertEqual(transition.nextName, next, file: file, line: line)
+        let expected = try XCTUnwrap(context.calendar.date(from: DateComponents(
+            year: year, month: month, day: day, hour: hour, minute: minute
+        )), file: file, line: line)
+        XCTAssertEqual(
+            transition.endTime.timeIntervalSince(expected),
+            0,
+            accuracy: toleranceMinutes * 60,
+            file: file,
+            line: line
+        )
+    }
+
+    private func limbName(_ kind: PanchangLimbKind, in panchang: Panchang) -> String {
+        switch kind {
+        case .tithi: return panchang.tithiName
+        case .nakshatra: return panchang.nakshatraName
+        case .yoga: return panchang.yogaName
+        case .karana: return panchang.karanaName
+        }
+    }
+
+    private func assertLocalInterval(
+        _ period: (start: Date, end: Date, label: String),
+        startHour: Int,
+        startMinute: Int,
+        endHour: Int,
+        endMinute: Int,
+        context: CalculationContext,
+        toleranceMinutes: Double,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let components = context.localDayComponents
+        let start = try XCTUnwrap(context.calendar.date(from: DateComponents(
+            year: components.year,
+            month: components.month,
+            day: components.day,
+            hour: startHour,
+            minute: startMinute
+        )), file: file, line: line)
+        let end = try XCTUnwrap(context.calendar.date(from: DateComponents(
+            year: components.year,
+            month: components.month,
+            day: components.day,
+            hour: endHour,
+            minute: endMinute
+        )), file: file, line: line)
+        XCTAssertEqual(period.start.timeIntervalSince(start), 0, accuracy: toleranceMinutes * 60, file: file, line: line)
+        XCTAssertEqual(period.end.timeIntervalSince(end), 0, accuracy: toleranceMinutes * 60, file: file, line: line)
     }
 }

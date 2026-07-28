@@ -20,7 +20,7 @@ enum RitualExperienceMode: String, CaseIterable, Identifiable {
     var summary: String {
         switch self {
         case .ritualNow:
-            return "A glanceable local-noon reference"
+            return "A glanceable local-sunrise reference"
         case .vedicLedger:
             return "An editorial Vedic almanac"
         case .fiveLimbFocus:
@@ -102,20 +102,20 @@ struct PanchangExperienceHome: View {
     let mode: RitualExperienceMode
     @Binding var selectedDate: Date
     let panchang: Panchang
-    let tithiEndTime: Date?
     let showTithiDetail: () -> Void
     let showYogaDetail: () -> Void
     let showKaranaDetail: () -> Void
 
     @Environment(\.cosmicTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.timeZone) private var timeZone
 
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 6) {
                 Image(systemName: "clock.badge.info")
                     .foregroundStyle(theme.primary)
-                Text(CalculationContext.dailySnapshotDisclosure)
+                Text(panchang.referenceDisclosure(in: timeZone))
                     .foregroundStyle(theme.semanticSecondaryText)
                 Spacer(minLength: 0)
             }
@@ -128,7 +128,6 @@ struct PanchangExperienceHome: View {
                     RitualNowExperience(
                         selectedDate: $selectedDate,
                         panchang: panchang,
-                        tithiEndTime: tithiEndTime,
                         showTithiDetail: showTithiDetail,
                         showYogaDetail: showYogaDetail,
                         showKaranaDetail: showKaranaDetail
@@ -137,7 +136,6 @@ struct PanchangExperienceHome: View {
                     VedicLedgerExperience(
                         selectedDate: $selectedDate,
                         panchang: panchang,
-                        tithiEndTime: tithiEndTime,
                         showTithiDetail: showTithiDetail,
                         showYogaDetail: showYogaDetail,
                         showKaranaDetail: showKaranaDetail
@@ -146,7 +144,6 @@ struct PanchangExperienceHome: View {
                     FiveLimbFocusExperience(
                         selectedDate: $selectedDate,
                         panchang: panchang,
-                        tithiEndTime: tithiEndTime,
                         showTithiDetail: showTithiDetail,
                         showYogaDetail: showYogaDetail,
                         showKaranaDetail: showKaranaDetail
@@ -162,12 +159,99 @@ struct PanchangExperienceHome: View {
     }
 }
 
+// MARK: - Daily transition timeline
+
+struct PanchangTransitionTimeline: View {
+    let referenceDate: Date
+    let transitions: [PanchangTransition]
+
+    @Environment(\.cosmicTheme) private var theme
+    @Environment(\.timeZone) private var timeZone
+
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar
+    }
+
+    var body: some View {
+        CosmicGlassCard(cornerRadius: 18) {
+            VStack(alignment: .leading, spacing: 10) {
+                CosmicSectionHeader(title: "Next Limb Changes", icon: "clock.arrow.circlepath")
+
+                if transitions.isEmpty {
+                    Label("Transition times are unavailable.", systemImage: "exclamationmark.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(theme.semanticSecondaryText)
+                } else {
+                    ForEach(Array(transitions.enumerated()), id: \.element.kind) { index, transition in
+                        HStack(spacing: 10) {
+                            Image(systemName: symbol(for: transition.kind))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(color(for: transition.kind))
+                                .frame(width: 24)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(transition.kind.rawValue.capitalized)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(theme.semanticSecondaryText)
+                                Text("\(transition.currentName) → \(transition.nextName)")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(theme.semanticPrimaryText)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.78)
+                            }
+                            Spacer(minLength: 8)
+                            Text(timeLabel(for: transition.endTime))
+                                .font(.caption.weight(.semibold))
+                                .monospacedDigit()
+                                .multilineTextAlignment(.trailing)
+                                .foregroundStyle(color(for: transition.kind))
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(
+                            "\(transition.kind.rawValue.capitalized), \(transition.currentName) changes to \(transition.nextName) at \(timeLabel(for: transition.endTime))"
+                        )
+
+                        if index < transitions.count - 1 {
+                            Divider().overlay(theme.semanticDivider)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func timeLabel(for date: Date) -> String {
+        let time = date.ritualShortTime(in: timeZone)
+        guard !calendar.isDate(date, inSameDayAs: referenceDate) else { return time }
+        return "\(date.ritualDate(template: "EEE d MMM", in: timeZone))\n\(time)"
+    }
+
+    private func symbol(for kind: PanchangLimbKind) -> String {
+        switch kind {
+        case .tithi: return "moon.fill"
+        case .nakshatra: return "sparkles"
+        case .yoga: return "circle.grid.cross.fill"
+        case .karana: return "divide.circle.fill"
+        }
+    }
+
+    private func color(for kind: PanchangLimbKind) -> Color {
+        switch kind {
+        case .tithi: return .blue
+        case .nakshatra: return theme.tertiary
+        case .yoga: return .green
+        case .karana: return .orange
+        }
+    }
+}
+
 // MARK: - Daily Snapshot
 
 private struct RitualNowExperience: View {
     @Binding var selectedDate: Date
     let panchang: Panchang
-    let tithiEndTime: Date?
     let showTithiDetail: () -> Void
     let showYogaDetail: () -> Void
     let showKaranaDetail: () -> Void
@@ -218,21 +302,22 @@ private struct RitualNowExperience: View {
                     PanchangExperienceRow(
                         symbol: "moon.fill", tint: .blue,
                         label: "Tithi", supporting: "Lunar day", value: panchang.tithiName,
-                        detail: tithiEndLabel, action: showTithiDetail
+                        detail: transitionLabel(for: .tithi), action: showTithiDetail
                     )
                     PanchangExperienceRow(
                         symbol: "sparkles", tint: theme.tertiary,
-                        label: "Nakshatra", supporting: "Lunar mansion", value: panchang.nakshatraName
+                        label: "Nakshatra", supporting: "Lunar mansion", value: panchang.nakshatraName,
+                        detail: transitionLabel(for: .nakshatra)
                     )
                     PanchangExperienceRow(
                         symbol: "circle.grid.cross.fill", tint: .green,
                         label: "Yoga", supporting: "Union", value: panchang.yogaName,
-                        action: showYogaDetail
+                        detail: transitionLabel(for: .yoga), action: showYogaDetail
                     )
                     PanchangExperienceRow(
                         symbol: "divide.circle.fill", tint: .orange,
                         label: "Karana", supporting: "Half-tithi", value: panchang.karanaName,
-                        isLast: true, action: showKaranaDetail
+                        detail: transitionLabel(for: .karana), isLast: true, action: showKaranaDetail
                     )
                 }
             }
@@ -264,15 +349,17 @@ private struct RitualNowExperience: View {
         }
     }
 
-    private var tithiEndLabel: String {
-        guard let tithiEndTime else { return "time unavailable" }
-        return "ends \(tithiEndTime.ritualShortTime(in: timeZone))"
+    private func transitionLabel(for kind: PanchangLimbKind) -> String {
+        guard let transition = panchang.transitions.transition(for: kind) else {
+            return "transition unavailable"
+        }
+        return "until \(transition.endTime.ritualTransitionLabel(relativeTo: panchang.date, in: timeZone))"
     }
 
     private var transitionDetail: String {
-        guard let tithiEndTime else { return "Transition time unavailable" }
-        let nextIndex = (panchang.tithiIndex + 1) % Panchang.tithiNames.count
-        return "\(Panchang.tithiNames[nextIndex]) begins at \(tithiEndTime.ritualShortTime(in: timeZone))"
+        guard let transition = panchang.transitions.tithi else { return "Transition time unavailable" }
+        let start = transition.endTime.ritualTransitionLabel(relativeTo: panchang.date, in: timeZone)
+        return "\(transition.nextName) begins at \(start)"
     }
 }
 
@@ -281,7 +368,6 @@ private struct RitualNowExperience: View {
 private struct VedicLedgerExperience: View {
     @Binding var selectedDate: Date
     let panchang: Panchang
-    let tithiEndTime: Date?
     let showTithiDetail: () -> Void
     let showYogaDetail: () -> Void
     let showKaranaDetail: () -> Void
@@ -349,8 +435,12 @@ private struct VedicLedgerExperience: View {
                         Image(systemName: "moon.stars.fill")
                             .foregroundStyle(theme.secondary)
                         Divider().frame(height: 30)
-                        Text(tithiEndTime.map {
-                            "\(panchang.tithiName) ends \($0.ritualShortTime(in: timeZone))"
+                        Text(panchang.transitions.tithi.map {
+                            let ending = $0.endTime.ritualTransitionLabel(
+                                relativeTo: panchang.date,
+                                in: timeZone
+                            )
+                            return "\(panchang.tithiName) ends \(ending)"
                         } ?? "Open \(panchang.tithiName) details")
                             .font(.system(.headline, design: .serif))
                         Spacer()
@@ -390,7 +480,6 @@ private enum FocusLimb: String, CaseIterable, Identifiable {
 private struct FiveLimbFocusExperience: View {
     @Binding var selectedDate: Date
     let panchang: Panchang
-    let tithiEndTime: Date?
     let showTithiDetail: () -> Void
     let showYogaDetail: () -> Void
     let showKaranaDetail: () -> Void
@@ -558,8 +647,17 @@ private struct FiveLimbFocusExperience: View {
     }
 
     private func supportingText(for limb: FocusLimb) -> String? {
-        guard limb == .tithi, let tithiEndTime else { return nil }
-        return "ends \(tithiEndTime.ritualShortTime(in: timeZone))"
+        let kind: PanchangLimbKind?
+        switch limb {
+        case .vara: kind = nil
+        case .tithi: kind = .tithi
+        case .nakshatra: kind = .nakshatra
+        case .yoga: kind = .yoga
+        case .karana: kind = .karana
+        }
+        guard let kind, let transition = panchang.transitions.transition(for: kind) else { return nil }
+        let ending = transition.endTime.ritualTransitionLabel(relativeTo: panchang.date, in: timeZone)
+        return "until \(ending) · then \(transition.nextName)"
     }
 
     private func color(for limb: FocusLimb) -> Color {
@@ -613,12 +711,14 @@ struct RitualDestinationBar: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity)
             .padding(7)
             .glassEffect(
                 .regular,
                 in: RoundedRectangle(cornerRadius: 28, style: .continuous)
             )
         }
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Panchang destinations")
     }
@@ -653,6 +753,7 @@ struct RitualDestinationBar: View {
             .frame(minHeight: usesIconOnlyPresentation ? 52 : 48)
             .contentShape(Rectangle())
         }
+        .frame(maxWidth: .infinity)
         .accessibilityLabel(destination.title)
         .accessibilityValue(selection == index ? "Selected" : "Not selected")
         .accessibilityHint("Shows the \(destination.title) destination")

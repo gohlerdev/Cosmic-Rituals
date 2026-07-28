@@ -2,13 +2,13 @@ import SwiftUI
 
 struct PanchangView: View {
     @State private var selectedDate = Date()
+    @State private var panchangSnapshot: (context: CalculationContext, value: Panchang)?
     @State private var muhurtas: [Muhurta] = []
     @State private var selectedTab = 0
     @State private var detailMuhurta: Muhurta?
     @State private var sunriseSunset: (Date, Date)?
     @State private var choghadiya: [Choghadiya] = []
     @State private var hora: [Hora] = []
-    @State private var tithiEndTime: Date?
     @State private var showThemePicker = false
     @State private var showLocationPicker = false
     @State private var selectedActivity: String = "Business"
@@ -111,15 +111,15 @@ struct PanchangView: View {
                 RitualLocationPicker(manager: locationManager)
             }
             .sheet(isPresented: $showTithiDetail) {
-                let p = CosmicEngine.getPanchang(context: calculationContext)
+                let p = resolvedPanchang
                 TithiDetailSheet(tithiIndex: p.tithiIndex)
             }
             .sheet(isPresented: $showYogaDetail) {
-                let p = CosmicEngine.getPanchang(context: calculationContext)
+                let p = resolvedPanchang
                 YogaDetailSheet(yogaIndex: p.yogaIndex)
             }
             .sheet(isPresented: $showKaranaDetail) {
-                let p = CosmicEngine.getPanchang(context: calculationContext)
+                let p = resolvedPanchang
                 KaranaDetailSheet(karanaIndex: p.karanaIndex)
             }
         }
@@ -130,9 +130,30 @@ struct PanchangView: View {
             }
         }
         .onChange(of: selectedDate) { _, _ in recompute() }
-        .onChange(of: locationManager.activeLocation) { _, _ in recompute() }
+        .onChange(of: locationManager.activeLocation) { oldLocation, newLocation in
+            let sourceTimeZone = TimeZone(identifier: oldLocation.timeZoneIdentifier) ?? .gmt
+            let targetTimeZone = TimeZone(identifier: newLocation.timeZoneIdentifier) ?? .gmt
+            let translatedDate = selectedDate.ritualCivilDay(
+                preservingDateFrom: sourceTimeZone,
+                into: targetTimeZone
+            )
+            if translatedDate == selectedDate {
+                recompute()
+            } else {
+                selectedDate = translatedDate
+            }
+        }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { date in
             now = date   // tick forces a re-render so isCurrent badges stay accurate
+        }
+        .task(id: calculationContext) {
+            let context = calculationContext
+            panchangPDF = nil
+            let data = await Task.detached(priority: .utility) {
+                PanchangPDFExporter.generatePDF(context: context)
+            }.value
+            guard !Task.isCancelled, calculationContext == context else { return }
+            panchangPDF = PanchangPDF(data: data)
         }
         .environment(\.timeZone, calculationContext.timeZone)
     }
@@ -147,24 +168,37 @@ struct PanchangView: View {
         locationManager.calculationContext(for: selectedDate)
     }
 
+    private var resolvedPanchang: Panchang {
+        let context = calculationContext
+        if let snapshot = panchangSnapshot, snapshot.context == context {
+            return snapshot.value
+        }
+        return CosmicEngine.getPanchang(context: context)
+    }
+
     // MARK: - Panchang five limbs
 
     private var panchangScrollView: some View {
         ScrollView {
             VStack(spacing: 16) {
-                let p = CosmicEngine.getPanchang(context: calculationContext)
+                let p = resolvedPanchang
 
                 PanchangExperienceHome(
                     mode: activeExperience,
                     selectedDate: $selectedDate,
                     panchang: p,
-                    tithiEndTime: tithiEndTime,
                     showTithiDetail: { showTithiDetail = true },
                     showYogaDetail: { showYogaDetail = true },
                     showKaranaDetail: { showKaranaDetail = true }
                 )
                 .padding(.horizontal)
                 .padding(.top, 12)
+
+                PanchangTransitionTimeline(
+                    referenceDate: p.date,
+                    transitions: p.transitions.chronological
+                )
+                .padding(.horizontal)
 
                 // Solar values are shown only when real rise/set events exist.
                 CosmicGlassCard {
@@ -177,26 +211,30 @@ struct PanchangView: View {
                                 solarTimeCell(icon: "sunset.fill", color: .red, label: "Sunset", time: set)
                             }
                             Divider()
-                            let brahma    = rise.addingTimeInterval(-96 * 60)
-                            let brahmaEnd = rise.addingTimeInterval(-48 * 60)
-                            HStack(spacing: 6) {
-                                CosmicIcon(name: "moon.zzz.fill", size: 13, color: .purple)
-                                Text("Brahma Muhurta")
-                                    .font(.caption).foregroundStyle(.secondary)
-                                Spacer()
-                                Text("\(shortTime(brahma)) – \(shortTime(brahmaEnd))")
-                                    .font(.caption.bold()).foregroundStyle(.purple)
+                            if let brahma = CosmicEngine.getBrahmaMuhurta(context: calculationContext) {
+                                HStack(spacing: 6) {
+                                    CosmicIcon(name: "moon.zzz.fill", size: 13, color: .purple)
+                                    Text("Brahma Muhurta")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text("\(shortTime(brahma.start)) – \(shortTime(brahma.end))")
+                                        .font(.caption.bold()).foregroundStyle(.purple)
+                                }
                             }
-                            let noon      = rise.addingTimeInterval(rise.distance(to: set) / 2)
-                            let abhijit   = noon.addingTimeInterval(-24 * 60)
-                            let abhijitEnd = noon.addingTimeInterval(24 * 60)
-                            HStack(spacing: 6) {
-                                CosmicIcon(name: "sun.max.circle.fill", size: 13, color: .yellow)
-                                Text("Abhijit Muhurta")
-                                    .font(.caption).foregroundStyle(.secondary)
-                                Spacer()
-                                Text("\(shortTime(abhijit)) – \(shortTime(abhijitEnd))")
-                                    .font(.caption.bold()).foregroundStyle(.yellow)
+                            if let abhijit = CosmicEngine.getAbhijitMuhurta(context: calculationContext) {
+                                HStack(spacing: 6) {
+                                    CosmicIcon(name: "sun.max.circle.fill", size: 13, color: .yellow)
+                                    Text("Abhijit Muhurta")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text("\(shortTime(abhijit.start)) – \(shortTime(abhijit.end))")
+                                        .font(.caption.bold()).foregroundStyle(.yellow)
+                                }
+                            } else if p.weekdayName == "Wednesday" {
+                                Label("Abhijit is not observed as auspicious on Wednesday.",
+                                      systemImage: "sun.max.circle")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                         } else {
                             Label("Sunrise-based schedules are unavailable for this latitude and date.",
@@ -256,7 +294,7 @@ struct PanchangView: View {
                 }
                 .padding(.horizontal)
 
-                auspiciousKalaCard(weekday: p.weekdayName)
+                inauspiciousKalaCard
 
             }
             .padding(.vertical)
@@ -416,7 +454,7 @@ struct PanchangView: View {
     // MARK: - Share
 
     private var panchangSummary: String {
-        let p = CosmicEngine.getPanchang(context: calculationContext)
+        let p = resolvedPanchang
         let nak = CosmicEngine.getMoonNakshatraPada(context: calculationContext)
         let sunNak = CosmicEngine.getSunNakshatra(context: calculationContext)
         let sunSignIdx = Int(sunNak.degree / 30.0) % 12
@@ -424,14 +462,17 @@ struct PanchangView: View {
 
         var lines: [String] = [
             "🌟 Panchang — \(df)",
-            "Reference: 12:00 PM local time",
+            "Reference: \(p.referenceDisclosure(in: calculationContext.timeZone))",
             "",
             "✦ Vara (Weekday): \(p.weekdayName)",
             "✦ Tithi: \(p.tithiIndex < 15 ? "Shukla" : "Krishna") \(p.tithiName)" +
-                (tithiEndTime.map { " (ends \(shortTime($0)))" } ?? ""),
-            "✦ Nakshatra: \(p.nakshatraName) (pada \(nak.pada))",
-            "✦ Yoga: \(p.yogaName)",
-            "✦ Karana: \(p.karanaName)",
+                (p.transitions.tithi.map { " (ends \($0.endTime.ritualTransitionLabel(relativeTo: p.date, in: calculationContext.timeZone)))" } ?? ""),
+            "✦ Nakshatra: \(p.nakshatraName) (pada \(nak.pada))" +
+                (p.transitions.nakshatra.map { " (ends \($0.endTime.ritualTransitionLabel(relativeTo: p.date, in: calculationContext.timeZone)))" } ?? ""),
+            "✦ Yoga: \(p.yogaName)" +
+                (p.transitions.yoga.map { " (ends \($0.endTime.ritualTransitionLabel(relativeTo: p.date, in: calculationContext.timeZone)))" } ?? ""),
+            "✦ Karana: \(p.karanaName)" +
+                (p.transitions.karana.map { " (ends \($0.endTime.ritualTransitionLabel(relativeTo: p.date, in: calculationContext.timeZone)))" } ?? ""),
             "",
             "☀ Surya Rashi: \(ZodiacSign.fromIndex(sunSignIdx).name)",
             "☀ Surya Nakshatra: \(sunNak.nakshatraName)",
@@ -579,24 +620,26 @@ struct PanchangView: View {
         }
     }
 
-    @ViewBuilder
-    private func auspiciousKalaCard(weekday: String) -> some View {
+    private var inauspiciousKalaCard: some View {
         let durMuhurtas = CosmicEngine.getDurMuhurta(context: calculationContext)
+        let rahuKala = CosmicEngine.getRahuKala(context: calculationContext)
+        let yamaganda = CosmicEngine.getYamaganda(context: calculationContext)
+        let gulikaKala = CosmicEngine.getGulikaKala(context: calculationContext)
 
-        CosmicGlassCard {
+        return CosmicGlassCard {
             VStack(alignment: .leading, spacing: 10) {
                 CosmicSectionHeader(title: "Inauspicious Periods", icon: "exclamationmark.triangle")
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Rahu Kala").font(.caption2).foregroundStyle(.tertiary)
-                        Text(kalaTimeString(slot: rahuKalaSlot(weekday), fallback: staticRahuKala(weekday)))
+                        Text(kalaTimeString(rahuKala))
                             .font(.subheadline.bold()).foregroundStyle(.red)
                         Text("Avoid new beginnings").font(.caption2).foregroundStyle(.secondary)
                     }
                     Divider()
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Yamaganda").font(.caption2).foregroundStyle(.tertiary)
-                        Text(kalaTimeString(slot: yamaGandaSlot(weekday), fallback: staticYamaGanda(weekday)))
+                        Text(kalaTimeString(yamaganda))
                             .font(.subheadline.bold()).foregroundStyle(.orange)
                         Text("Inauspicious period").font(.caption2).foregroundStyle(.secondary)
                     }
@@ -604,8 +647,7 @@ struct PanchangView: View {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Gulika Kala").font(.caption2).foregroundStyle(.tertiary)
-                    Text(kalaTimeString(slot: CosmicEngine.gulikaSlot(weekday: weekday),
-                                        fallback: "Check calendar"))
+                    Text(kalaTimeString(gulikaKala))
                         .font(.subheadline.bold()).foregroundStyle(.purple)
                     Text("Son of Saturn — highly inauspicious").font(.caption2).foregroundStyle(.secondary)
                 }
@@ -754,12 +796,11 @@ struct PanchangView: View {
 
     private func recompute() {
         let context = calculationContext
+        panchangSnapshot = (context, CosmicEngine.getPanchang(context: context))
         muhurtas = CosmicEngine.getMuhurtas(context: context)
         sunriseSunset = CosmicEngine.getSunriseSunset(context: context)
         choghadiya = CosmicEngine.getChoghadiya(context: context)
         hora = CosmicEngine.getHora(context: context)
-        tithiEndTime = CosmicEngine.getTithiEndTime(context: context)
-        panchangPDF = PanchangPDF(data: PanchangPDFExporter.generatePDF(context: context))
     }
 
     private func solarTimeCell(icon: String, color: Color, label: String, time: Date) -> some View {
@@ -773,11 +814,7 @@ struct PanchangView: View {
     }
 
     private func shortTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .none
-        formatter.timeStyle = .short
-        formatter.timeZone = calculationContext.timeZone
-        return formatter.string(from: date)
+        date.ritualShortTime(in: calculationContext.timeZone)
     }
 
     private func qualityColor(_ q: MuhurtaQuality) -> Color {
@@ -789,66 +826,9 @@ struct PanchangView: View {
         }
     }
 
-    // Rahu Kala: 1-based slot index within the 8 equal day divisions
-    private func rahuKalaSlot(_ weekday: String) -> Int {
-        switch weekday {
-        case "Sunday":    return 8
-        case "Monday":    return 2
-        case "Tuesday":   return 7
-        case "Wednesday": return 5
-        case "Thursday":  return 6
-        case "Friday":    return 4
-        case "Saturday":  return 3
-        default:          return 1
-        }
-    }
-
-    // Yamaganda: 1-based slot index within the 8 equal day divisions
-    private func yamaGandaSlot(_ weekday: String) -> Int {
-        switch weekday {
-        case "Sunday":    return 5
-        case "Monday":    return 4
-        case "Tuesday":   return 3
-        case "Wednesday": return 2
-        case "Thursday":  return 1
-        case "Friday":    return 7
-        case "Saturday":  return 6
-        default:          return 1
-        }
-    }
-
-    private func kalaTimeString(slot: Int, fallback: String) -> String {
-        guard let (rise, set) = sunriseSunset else { return "Unavailable" }
-        let slotDuration = set.timeIntervalSince(rise) / 8.0
-        let start = rise.addingTimeInterval(Double(slot - 1) * slotDuration)
-        let end   = start.addingTimeInterval(slotDuration)
-        return "\(shortTime(start)) – \(shortTime(end))"
-    }
-
-    private func staticRahuKala(_ weekday: String) -> String {
-        switch weekday {
-        case "Sunday":    return "4:30–6:00 PM"
-        case "Monday":    return "7:30–9:00 AM"
-        case "Tuesday":   return "3:00–4:30 PM"
-        case "Wednesday": return "12:00–1:30 PM"
-        case "Thursday":  return "1:30–3:00 PM"
-        case "Friday":    return "10:30 AM–12:00 PM"
-        case "Saturday":  return "9:00–10:30 AM"
-        default:          return "Check calendar"
-        }
-    }
-
-    private func staticYamaGanda(_ weekday: String) -> String {
-        switch weekday {
-        case "Sunday":    return "12:00–1:30 PM"
-        case "Monday":    return "10:30 AM–12:00 PM"
-        case "Tuesday":   return "9:00–10:30 AM"
-        case "Wednesday": return "7:30–9:00 AM"
-        case "Thursday":  return "6:00–7:30 AM"
-        case "Friday":    return "3:00–4:30 PM"
-        case "Saturday":  return "1:30–3:00 PM"
-        default:          return "Check calendar"
-        }
+    private func kalaTimeString(_ period: (start: Date, end: Date)?) -> String {
+        guard let period else { return "Unavailable" }
+        return "\(shortTime(period.start)) – \(shortTime(period.end))"
     }
 }
 
@@ -885,6 +865,37 @@ private struct ThemePickerSheet: View {
                             Text("Automatic ritual alerts are not enabled in this build. This prevents stale timings after a date or location change.")
                                 .font(.caption)
                                 .foregroundStyle(theme.semanticSecondaryText)
+                        }
+                        .padding(.horizontal)
+
+                        Divider().overlay(theme.semanticDivider).padding(.horizontal)
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            Label("Calculation Integrity", systemImage: "checkmark.shield.fill")
+                                .font(.caption.bold())
+                                .foregroundStyle(theme.semanticPrimaryText)
+
+                            integrityRow(
+                                title: "Daily reference",
+                                detail: "Selected location's sunrise; local noon only when no sunrise exists"
+                            )
+                            integrityRow(
+                                title: "Five limbs",
+                                detail: "Meeus Sun and Moon series · Lahiri (Chitra Paksha) ayanamsha"
+                            )
+                            integrityRow(
+                                title: "Transitions",
+                                detail: "Tithi, Nakshatra, Yoga, and Karana solved independently"
+                            )
+                            integrityRow(
+                                title: "Privacy",
+                                detail: "All calculations and the city catalog stay on device"
+                            )
+
+                            Text("The numerical boundary solver has sub-second resolution. The compact offline ephemeris is checked against published civil-time fixtures with a conservative ±12 minute validation envelope. Regional observance rules can differ; confirm ceremonial timings with a qualified practitioner.")
+                                .font(.caption)
+                                .foregroundStyle(theme.semanticSecondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         .padding(.horizontal)
 
@@ -971,6 +982,19 @@ private struct ThemePickerSheet: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private func integrityRow(title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(theme.semanticPrimaryText)
+            Text(detail)
+                .font(.caption2)
+                .foregroundStyle(theme.semanticSecondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

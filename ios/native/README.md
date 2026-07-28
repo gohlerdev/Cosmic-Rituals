@@ -8,6 +8,8 @@ cosmic-glass look and its sidereal (Lahiri ayanamsha) ephemeris.
 
 - **Pancha Anga (Five Limbs)** for any date: Vara (weekday), Tithi (lunar day),
   Nakshatra, Yoga, and Karana.
+- **Sunrise-anchored day model** with independently solved Tithi, Nakshatra, Yoga,
+  and Karana transition times, plus a truthful polar fallback.
 - **Nakshatra detail** — the Moon's nakshatra with its symbol, gana, ruling (dasha) lord,
   pada (1–4), Moon sign, and Shukla/Krishna paksha phase.
 - **30 Muhurtas** — all fifteen day and fifteen night windows, each named and tagged by
@@ -17,7 +19,7 @@ cosmic-glass look and its sidereal (Lahiri ayanamsha) ephemeris.
 
 ## Build & run
 
-Open `CosmicRituals.xcodeproj` in **Xcode 16+** and run the `CosmicRituals` scheme on an
+Open `CosmicRituals.xcodeproj` in **Xcode 26+** and run the `CosmicRituals` scheme on an
 iOS 26 simulator or device.
 
 - Deployment target: **iOS 26** (the muhurta summary pills use the `.glassEffect` API).
@@ -36,8 +38,14 @@ CosmicRituals/
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the engine details and exactly what was
 imported from the parent Cosmic Astrology app.
 
-## Accuracy
+## Accuracy and integrity
 
-Positions use Meeus algorithms with the Lahiri (Chitra Paksha) ayanamsha. Muhurta windows
-are derived from local sunrise/sunset (Delhi default location). For ritually precise
-timings, confirm with a qualified Jyotishi.
+Positions use Meeus algorithms with the Lahiri (Chitra Paksha) ayanamsha. Muhurta
+windows are derived from sunrise and sunset for the explicitly selected location
+and IANA time zone. Independent civil-time fixtures cover solar events, all four
+limb transitions, Dur Muhurta, Abhijit, DST, and polar behavior.
+
+See [ACCURACY.md](ACCURACY.md) for method provenance, validation tolerances, and
+features that are intentionally not presented as reference-grade. For
+consequential ceremonial timing, confirm the chosen convention with a qualified
+practitioner.

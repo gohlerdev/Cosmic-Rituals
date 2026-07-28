@@ -16,6 +16,16 @@ private func shortTime(_ date: Date, in timeZone: TimeZone) -> String {
     return formatter.string(from: date)
 }
 
+private func spokenTransition(
+    _ transition: PanchangTransition?,
+    relativeTo referenceDate: Date,
+    in timeZone: TimeZone
+) -> String {
+    guard let transition else { return "transition unavailable" }
+    let ending = transition.endTime.ritualTransitionLabel(relativeTo: referenceDate, in: timeZone)
+    return "\(transition.currentName) until \(ending), then \(transition.nextName)"
+}
+
 // MARK: - "What's the muhurta right now?" Intent
 
 struct CurrentMuhurtaIntent: AppIntent {
@@ -47,7 +57,7 @@ struct CurrentMuhurtaIntent: AppIntent {
 
 struct TodayPanchangIntent: AppIntent {
     static let title: LocalizedStringResource = "Daily Panchang Snapshot"
-    static let description = IntentDescription("Get the five limbs sampled at local noon: Vara, Tithi, Nakshatra, Yoga, and Karana.")
+    static let description = IntentDescription("Get the five limbs at local sunrise, with their next transition times.")
 
     @MainActor
     func perform() async throws -> some ReturnsValue<String> & ProvidesDialog {
@@ -56,7 +66,10 @@ struct TodayPanchangIntent: AppIntent {
             return .result(value: reply, dialog: IntentDialog(stringLiteral: reply))
         }
         let p = CosmicEngine.getPanchang(context: context)
-        let summary = "Daily reference for \(location.name), sampled at 12:00 PM local time. \(p.weekdayName). Tithi: \(p.tithiName). Nakshatra: \(p.nakshatraName). Yoga: \(p.yogaName). Karana: \(p.karanaName)."
+        let reference = p.sunriseTime == nil
+            ? "Sunrise is unavailable; this snapshot uses \(shortTime(p.date, in: context.timeZone)) local time."
+            : "The Panchang day begins at local sunrise."
+        let summary = "Daily reference for \(location.name). \(reference) \(p.weekdayName). Tithi: \(spokenTransition(p.transitions.tithi, relativeTo: p.date, in: context.timeZone)). Nakshatra: \(spokenTransition(p.transitions.nakshatra, relativeTo: p.date, in: context.timeZone)). Yoga: \(spokenTransition(p.transitions.yoga, relativeTo: p.date, in: context.timeZone)). Karana: \(spokenTransition(p.transitions.karana, relativeTo: p.date, in: context.timeZone))."
         return .result(value: summary, dialog: IntentDialog(stringLiteral: summary))
     }
 }
@@ -110,7 +123,7 @@ struct CosmicShortcuts: AppShortcutsProvider {
             intent: TodayPanchangIntent(),
             phrases: [
                 "Daily Panchang snapshot in \(.applicationName)",
-                "Panchang noon reference in \(.applicationName)",
+                "Panchang sunrise reference in \(.applicationName)",
                 "Vedic day snapshot in \(.applicationName)"
             ],
             shortTitle: "Daily Snapshot",

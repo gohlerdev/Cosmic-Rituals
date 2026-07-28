@@ -1,5 +1,8 @@
 import SwiftUI
 
+// Prototype view intentionally not routed into shipping navigation. The
+// low-precision source model must meet ACCURACY.md's evidence gate first.
+
 struct GrahaPositionsCard: View {
     let grahas: [GrahaPosition]
     @Environment(\.cosmicTheme) private var theme

@@ -207,17 +207,44 @@ enum CosmicEngine {
 
     // MARK: - Panchang
 
-    static func getPanchang(context: CalculationContext) -> Panchang {
-        getPanchang(date: context.localNoon, calendar: context.calendar)
+    static func getPanchang(
+        context: CalculationContext,
+        includeTransitions: Bool = true
+    ) -> Panchang {
+        let solar = getSunriseSunset(context: context)
+        let referenceDate = solar?.sunrise ?? context.localNoon
+        return getPanchang(
+            date: referenceDate,
+            calendar: context.calendar,
+            sunriseTime: solar?.sunrise,
+            sunsetTime: solar?.sunset,
+            transitions: includeTransitions ? getPanchangTransitions(after: referenceDate) : .unavailable
+        )
+    }
+
+    private static func panchangReferenceDate(for context: CalculationContext) -> Date {
+        getSunriseSunset(context: context)?.sunrise ?? context.localNoon
     }
 
     static func getPanchang(date: Date, timezoneIdentifier: String = "UTC") -> Panchang {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: timezoneIdentifier) ?? .gmt
-        return getPanchang(date: date, calendar: calendar)
+        return getPanchang(
+            date: date,
+            calendar: calendar,
+            sunriseTime: nil,
+            sunsetTime: nil,
+            transitions: .unavailable
+        )
     }
 
-    private static func getPanchang(date: Date, calendar: Calendar) -> Panchang {
+    private static func getPanchang(
+        date: Date,
+        calendar: Calendar,
+        sunriseTime: Date?,
+        sunsetTime: Date?,
+        transitions: PanchangTransitions
+    ) -> Panchang {
         let jd = julianDateFromDate(date)
         let sunLon  = siderealize(sunLongitude(jd: jd), jd: jd)
         let moonLon = siderealize(moonLongitude(jd: jd), jd: jd)
@@ -255,8 +282,9 @@ enum CosmicEngine {
             weekdayName: weekdayNames[(weekday - 1).clamped(to: 0...6)],
             moonSignIndex: moonSignIdx,
             moonSignName: ZodiacSign.fromIndex(moonSignIdx).name,
-            sunriseTime: nil,
-            sunsetTime: nil
+            sunriseTime: sunriseTime,
+            sunsetTime: sunsetTime,
+            transitions: transitions
         )
     }
 
@@ -265,6 +293,124 @@ enum CosmicEngine {
         if raw == 0 { return 10 } // Kimstughna
         if raw <= 56 { return (raw - 1) % 7 } // Bava…Vishti repeat eight times
         return raw - 50 // 57 Shakuni, 58 Chatushpada, 59 Naga
+    }
+
+    // MARK: - Panchang limb boundaries
+
+    /// Solves the next boundary of every changing Panchang limb from an exact
+    /// reference instant. Each angle is monotonic over the short search window,
+    /// so a bracketed binary search gives sub-second numerical precision without
+    /// coupling the result to the UI's refresh cadence.
+    static func getPanchangTransitions(after date: Date) -> PanchangTransitions {
+        PanchangTransitions(
+            tithi: nextTransition(for: .tithi, after: date),
+            nakshatra: nextTransition(for: .nakshatra, after: date),
+            yoga: nextTransition(for: .yoga, after: date),
+            karana: nextTransition(for: .karana, after: date)
+        )
+    }
+
+    private struct LimbTransitionState {
+        let angle: Double
+        let segmentSize: Double
+        let currentName: String
+        let nextName: String
+    }
+
+    private static func nextTransition(
+        for kind: PanchangLimbKind,
+        after date: Date
+    ) -> PanchangTransition? {
+        let initial = limbTransitionState(for: kind, at: date)
+        let remainder = initial.angle.truncatingRemainder(dividingBy: initial.segmentSize)
+        let distanceToBoundary = remainder < 1e-10
+            ? initial.segmentSize
+            : initial.segmentSize - remainder
+
+        func accumulatedAngle(at candidate: Date) -> Double {
+            let angle = limbTransitionState(for: kind, at: candidate).angle
+            return normalize360(angle - initial.angle)
+        }
+
+        var lower = date
+        var upper = date.addingTimeInterval(36 * 3_600)
+        while accumulatedAngle(at: upper) < distanceToBoundary,
+              upper.timeIntervalSince(date) < 72 * 3_600 {
+            upper = upper.addingTimeInterval(12 * 3_600)
+        }
+        guard accumulatedAngle(at: upper) >= distanceToBoundary else { return nil }
+
+        for _ in 0..<56 {
+            let midpoint = lower.addingTimeInterval(upper.timeIntervalSince(lower) / 2)
+            if accumulatedAngle(at: midpoint) >= distanceToBoundary {
+                upper = midpoint
+            } else {
+                lower = midpoint
+            }
+        }
+
+        return PanchangTransition(
+            kind: kind,
+            currentName: initial.currentName,
+            nextName: initial.nextName,
+            endTime: lower.addingTimeInterval(upper.timeIntervalSince(lower) / 2)
+        )
+    }
+
+    private static func limbTransitionState(
+        for kind: PanchangLimbKind,
+        at date: Date
+    ) -> LimbTransitionState {
+        let jd = julianDateFromDate(date)
+        let sunSidereal = siderealize(sunLongitude(jd: jd), jd: jd)
+        let moonSidereal = siderealize(moonLongitude(jd: jd), jd: jd)
+        let elongation = normalize360(moonSidereal - sunSidereal)
+
+        let angle: Double
+        let segmentSize: Double
+        let segmentCount: Int
+        switch kind {
+        case .tithi:
+            angle = elongation
+            segmentSize = 12
+            segmentCount = 30
+        case .nakshatra:
+            angle = moonSidereal
+            segmentSize = 360.0 / 27.0
+            segmentCount = 27
+        case .yoga:
+            angle = normalize360(sunSidereal + moonSidereal)
+            segmentSize = 360.0 / 27.0
+            segmentCount = 27
+        case .karana:
+            angle = elongation
+            segmentSize = 6
+            segmentCount = 60
+        }
+
+        let rawIndex = Int(angle / segmentSize).clamped(to: 0...(segmentCount - 1))
+        let nextRawIndex = (rawIndex + 1) % segmentCount
+        let names: (current: String, next: String)
+        switch kind {
+        case .tithi:
+            names = (Panchang.tithiNames[rawIndex], Panchang.tithiNames[nextRawIndex])
+        case .nakshatra:
+            names = (Panchang.nakshatraNames[rawIndex], Panchang.nakshatraNames[nextRawIndex])
+        case .yoga:
+            names = (Panchang.yogaNames[rawIndex], Panchang.yogaNames[nextRawIndex])
+        case .karana:
+            names = (
+                Panchang.karanaNames[karanaIndex(forHalfTithiIndex: rawIndex)],
+                Panchang.karanaNames[karanaIndex(forHalfTithiIndex: nextRawIndex)]
+            )
+        }
+
+        return LimbTransitionState(
+            angle: angle,
+            segmentSize: segmentSize,
+            currentName: names.current,
+            nextName: names.next
+        )
     }
 
     // MARK: - Sunrise / Sunset (NOAA / Meeus ch.15)
@@ -394,7 +540,7 @@ enum CosmicEngine {
     }
 
     static func getMoonNakshatraPada(context: CalculationContext) -> NakshatraResult {
-        getMoonNakshatraPada(date: context.localNoon)
+        getMoonNakshatraPada(date: panchangReferenceDate(for: context))
     }
 
     /// Returns sunrise and sunset as `Date` values for a given day and location.
@@ -419,6 +565,36 @@ enum CosmicEngine {
             longitude: lonDeg,
             timeZoneIdentifier: TimeZone.autoupdatingCurrent.identifier
         ))
+    }
+
+    // MARK: - Sunrise-based daily observances
+
+    /// Brahma Muhurta is the traditional 48-minute muhurta beginning two
+    /// muhurtas before sunrise and ending one muhurta before sunrise.
+    static func getBrahmaMuhurta(context: CalculationContext) -> (start: Date, end: Date)? {
+        guard let sunrise = getSunriseSunset(context: context)?.sunrise else { return nil }
+        return (
+            start: sunrise.addingTimeInterval(-96 * 60),
+            end: sunrise.addingTimeInterval(-48 * 60)
+        )
+    }
+
+    /// Abhijit is the eighth of fifteen daylight muhurtas, centered on local
+    /// apparent noon. It scales with daylight rather than assuming a fixed
+    /// 48-minute clock interval. Classical daily Panchang practice does not
+    /// present it as an auspicious window on Wednesday.
+    static func getAbhijitMuhurta(context: CalculationContext) -> (start: Date, end: Date)? {
+        guard context.localDayComponents.weekday != 4,
+              let solar = getSunriseSunset(context: context) else {
+            return nil
+        }
+        let daylight = solar.sunset.timeIntervalSince(solar.sunrise)
+        let muhurtaLength = daylight / 15.0
+        let solarNoon = solar.sunrise.addingTimeInterval(daylight / 2.0)
+        return (
+            start: solarNoon.addingTimeInterval(-muhurtaLength / 2.0),
+            end: solarNoon.addingTimeInterval(muhurtaLength / 2.0)
+        )
     }
 
     // MARK: - Choghadiya (Vedic day-segments)
@@ -517,8 +693,11 @@ enum CosmicEngine {
         ))
     }
 
-    // MARK: - Moonrise / Moonset (approximate; Meeus §15 adapted)
+    // MARK: - Moonrise / Moonset prototype (not surfaced)
 
+    /// Experimental approximation retained for research only. It is not
+    /// topocentric and must not be wired into a shipping surface without the
+    /// validation work listed in ACCURACY.md.
     static func getMoonriseMoonset(date: Date, latDeg: Double, lonDeg: Double) -> (moonrise: Date?, moonset: Date?) {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
@@ -552,41 +731,17 @@ enum CosmicEngine {
     }
 
     static func getSunNakshatra(context: CalculationContext) -> NakshatraResult {
-        getSunNakshatra(date: context.localNoon)
+        getSunNakshatra(date: panchangReferenceDate(for: context))
     }
 
-    // MARK: - Tithi End Time (binary search to next 12° elongation boundary)
+    // MARK: - Tithi End Time
 
     static func getTithiEndTime(date: Date) -> Date? {
-        let jd0 = julianDateFromDate(date)
-
-        func elongRaw(_ jd: Double) -> Double {
-            let sL = siderealize(sunLongitude(jd: jd), jd: jd)
-            let mL = siderealize(moonLongitude(jd: jd), jd: jd)
-            return normalize360(mL - sL)
-        }
-
-        let e0 = elongRaw(jd0)
-        let degsToNext = 12.0 - e0.truncatingRemainder(dividingBy: 12.0)
-
-        // Monotonically increasing accumulated elongation since jd0
-        func accumulated(_ jd: Double) -> Double {
-            let e = elongRaw(jd)
-            return e < e0 - 180 ? e + 360 - e0 : e - e0
-        }
-
-        var lo = jd0, hi = jd0 + 2.0
-        guard accumulated(hi) >= degsToNext else { return nil }
-
-        for _ in 0..<52 {
-            let mid = (lo + hi) / 2.0
-            if accumulated(mid) >= degsToNext { hi = mid } else { lo = mid }
-        }
-        return date.addingTimeInterval(((lo + hi) / 2.0 - jd0) * 86400.0)
+        nextTransition(for: .tithi, after: date)?.endTime
     }
 
     static func getTithiEndTime(context: CalculationContext) -> Date? {
-        getTithiEndTime(date: context.localNoon)
+        nextTransition(for: .tithi, after: panchangReferenceDate(for: context))?.endTime
     }
 
     // MARK: - Chandra Bala & Tara Bala
@@ -622,47 +777,84 @@ enum CosmicEngine {
         )
     }
 
-    // MARK: - Gulika Kala slot (1-based, within 8 equal day divisions)
+    // MARK: - Sunrise-based inauspicious kalas
 
-    static func gulikaSlot(weekday: String) -> Int {
-        switch weekday {
-        case "Sunday":    return 7
-        case "Monday":    return 6
-        case "Tuesday":   return 5
-        case "Wednesday": return 4
-        case "Thursday":  return 3
-        case "Friday":    return 2
-        case "Saturday":  return 1
-        default:          return 1
-        }
+    /// Rahu Kala, Yamaganda, and Gulika Kala are weekday-specific selections
+    /// from eight equal daylight divisions. Keeping the tables in the engine
+    /// prevents presentation code from inventing clock-time fallbacks.
+    static func getRahuKala(context: CalculationContext) -> (start: Date, end: Date)? {
+        let slots = [8, 2, 7, 5, 6, 4, 3] // Sunday through Saturday
+        return daylightKala(context: context, slotsByWeekday: slots)
     }
 
-    /// Returns the 1-2 classically inauspicious Dur Muhurta windows for the given date.
-    /// Indices are 0-based into the 15 day muhurtas; table from Muhurta Chintamani.
+    static func getYamaganda(context: CalculationContext) -> (start: Date, end: Date)? {
+        let slots = [5, 4, 3, 2, 1, 7, 6] // Sunday through Saturday
+        return daylightKala(context: context, slotsByWeekday: slots)
+    }
+
+    static func getGulikaKala(context: CalculationContext) -> (start: Date, end: Date)? {
+        let slots = [7, 6, 5, 4, 3, 2, 1] // Sunday through Saturday
+        return daylightKala(context: context, slotsByWeekday: slots)
+    }
+
+    private static func daylightKala(
+        context: CalculationContext,
+        slotsByWeekday: [Int]
+    ) -> (start: Date, end: Date)? {
+        guard slotsByWeekday.count == 7,
+              let weekday = context.localDayComponents.weekday,
+              (1...7).contains(weekday),
+              let solar = getSunriseSunset(context: context) else {
+            return nil
+        }
+        let slotLength = solar.sunset.timeIntervalSince(solar.sunrise) / 8.0
+        let slot = slotsByWeekday[weekday - 1]
+        let start = solar.sunrise.addingTimeInterval(Double(slot - 1) * slotLength)
+        return (start: start, end: start.addingTimeInterval(slotLength))
+    }
+
+    /// Returns the classically inauspicious Dur Muhurta windows for the Vedic day.
+    /// Indices are zero-based within the 15 daylight or 15 night divisions.
+    /// Tuesday's second period is a night division; treating every weekday entry
+    /// as a daylight slot produces a plausible but materially wrong result.
     static func getDurMuhurta(context: CalculationContext) -> [(start: Date, end: Date, label: String)] {
-        guard let ss = getSunriseSunset(context: context) else { return [] }
-        let dayDuration = ss.sunset.timeIntervalSince(ss.sunrise)
-        let slotLen = dayDuration / 15.0
+        guard let today = getSunriseSunset(context: context),
+              let tomorrow = getSunriseSunset(context: context.advancedByLocalDays(1)) else {
+            return []
+        }
+        let daySlotLength = today.sunset.timeIntervalSince(today.sunrise) / 15.0
+        let nightSlotLength = tomorrow.sunrise.timeIntervalSince(today.sunset) / 15.0
 
         // Weekday from Calendar (1=Sun…7=Sat)
         let wd = context.localDayComponents.weekday ?? 1
-        let slots: [Int]
+        let daySlots: [Int]
+        let nightSlots: [Int]
         switch wd {
-        case 1: slots = [3, 8]    // Sunday:    4th (Vidha) + 9th (Kutupa)
-        case 2: slots = [6, 14]   // Monday:    7th + 15th
-        case 3: slots = [0, 7]    // Tuesday:   1st + 8th
-        case 4: slots = [3]       // Wednesday: 4th (Rohita)
-        case 5: slots = [5, 9]    // Thursday:  6th + 10th
-        case 6: slots = [2, 7]    // Friday:    3rd + 8th
-        case 7: slots = [2, 9]    // Saturday:  3rd + 10th
-        default: slots = []
+        case 1: (daySlots, nightSlots) = ([13], [])
+        case 2: (daySlots, nightSlots) = ([8, 11], [])
+        case 3: (daySlots, nightSlots) = ([3], [6])
+        case 4: (daySlots, nightSlots) = ([7], [])
+        case 5: (daySlots, nightSlots) = ([5, 11], [])
+        case 6: (daySlots, nightSlots) = ([3, 8], [])
+        case 7: (daySlots, nightSlots) = ([0, 1], [])
+        default: (daySlots, nightSlots) = ([], [])
         }
 
-        let labels = slots.enumerated().map { i, _ in i == 0 ? "1st" : "2nd" }
-        return zip(slots, labels).map { (idx, lbl) in
-            let start = ss.sunrise.addingTimeInterval(Double(idx) * slotLen)
-            let end   = start.addingTimeInterval(slotLen)
-            return (start: start, end: end, label: lbl)
+        var periods = daySlots.map { index in
+            let start = today.sunrise.addingTimeInterval(Double(index) * daySlotLength)
+            return (start: start, end: start.addingTimeInterval(daySlotLength), label: "")
+        }
+        periods += nightSlots.map { index in
+            let start = today.sunset.addingTimeInterval(Double(index) * nightSlotLength)
+            return (start: start, end: start.addingTimeInterval(nightSlotLength), label: "")
+        }
+        periods.sort { $0.start < $1.start }
+        return periods.enumerated().map { index, period in
+            (
+                start: period.start,
+                end: period.end,
+                label: periods.count == 1 ? "Dur Muhurta" : (index == 0 ? "1st" : "2nd")
+            )
         }
     }
 
@@ -675,7 +867,7 @@ enum CosmicEngine {
         ))
     }
 
-    // MARK: - Vedic Calendar Extended Info
+    // MARK: - Vedic Calendar Extended Info prototype (not surfaced)
 
     static func getVedicCalendarInfo(date: Date, latDeg: Double, lonDeg: Double,
                                      birthNakshatraIndex: Int = -1) -> VedicCalendarInfo {
@@ -763,7 +955,7 @@ enum CosmicEngine {
         )
     }
 
-    // MARK: - Nine Graha Positions (Schlyter low-precision algorithm)
+    // MARK: - Nine Graha Positions prototype (not surfaced; low precision)
 
     private enum PlanetID { case mercury, venus, mars, jupiter, saturn }
 
