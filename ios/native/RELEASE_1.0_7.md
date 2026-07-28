@@ -3,7 +3,7 @@
 Date: 2026-07-28
 Bundle ID: `com.cosmic.rituals`
 Platform: iOS/iPadOS 26
-Disposition: uploaded for internal TestFlight testing only; Apple processing pending
+Disposition: processing complete; available to the internal TestFlight group
 
 ## Delivery result
 
@@ -11,10 +11,12 @@ Disposition: uploaded for internal TestFlight testing only; Apple processing pen
 - App Store Connect delivery UUID:
   `100fee66-edcd-410e-a13d-5d18f2b07b20`.
 - Apple transport completed with no errors or warnings.
-- The upload began App Store Connect processing at 23:50 IST.
+- The upload completed App Store Connect processing with status `Complete`.
 - Export used `testFlightInternalTestingOnly = true`; Apple documents that such a
   build cannot be distributed through external TestFlight or the App Store.
-- App Store processing completion and tester-group availability are not yet claimed.
+- The signed-in Connect app showed build `7 Internal` with status `Testing`, attached
+  to `Cosmic Rituals Internal` with two tester invites and a 90-day expiry window.
+- External beta review and external-group availability are not claimed.
 
 ## Reliability fix
 
