@@ -44,7 +44,10 @@ struct PanchangView: View {
                     } else if selectedTab == 2 {
                         muhurtaScrollView
                     } else if selectedTab == 3 {
-                        PoojaVidhiLibraryView()
+                        PoojaVidhiLibraryView(
+                            dayContext: poojaDayContext,
+                            changeLocation: { showLocationPicker = true }
+                        )
                     } else {
                         MonthlyCalendarView(selectedDate: $selectedDate, calculationContext: calculationContext)
                     }
@@ -185,6 +188,19 @@ struct PanchangView: View {
             return snapshot.value
         }
         return CosmicEngine.getPanchang(context: context)
+    }
+
+    private var poojaDayContext: RitualDayContext {
+        let panchang = resolvedPanchang
+        let timeZone = calculationContext.timeZone
+        return RitualDayContext(
+            civilDate: selectedDate.ritualCompleteDate(in: timeZone),
+            locationName: locationManager.activeLocation.name,
+            timeZoneIdentifier: timeZone.identifier,
+            tithiName: panchang.tithiName,
+            nakshatraName: panchang.nakshatraName,
+            sunriseTime: panchang.sunriseTime?.ritualShortTime(in: timeZone)
+        )
     }
 
     // MARK: - Panchang five limbs

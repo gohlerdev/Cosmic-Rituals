@@ -1,9 +1,17 @@
 import SwiftUI
 
 struct PoojaVidhiLibraryView: View {
+    let dayContext: RitualDayContext?
+    let changeLocation: (() -> Void)?
     @State private var query = ""
     @State private var selectedCategory: PoojaCategory?
     @Environment(\.cosmicTheme) private var theme
+    @EnvironmentObject private var ritualSessionStore: RitualSessionStore
+
+    init(dayContext: RitualDayContext? = nil, changeLocation: (() -> Void)? = nil) {
+        self.dayContext = dayContext
+        self.changeLocation = changeLocation
+    }
 
     private var results: [PoojaVidhi] {
         PoojaVidhiCatalog.search(query, category: selectedCategory)
@@ -13,6 +21,23 @@ struct PoojaVidhiLibraryView: View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 libraryHeader
+                if let dayContext {
+                    RitualDayContextCard(context: dayContext, changeLocation: changeLocation)
+                }
+                if let session = ritualSessionStore.mostRecentUnfinishedSession,
+                   let vidhi = PoojaVidhiCatalog.vidhi(id: session.id) {
+                    NavigationLink {
+                        if session.status == .inProgress {
+                            GuidedPoojaView(vidhi: vidhi)
+                        } else {
+                            PoojaVidhiDetailView(vidhi: vidhi)
+                        }
+                    } label: {
+                        PoojaResumeCard(vidhi: vidhi, session: session)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("pooja.resume.\(vidhi.id)")
+                }
                 categoryPicker
 
                 if results.isEmpty {
@@ -144,6 +169,108 @@ struct PoojaVidhiLibraryView: View {
     }
 }
 
+private struct RitualDayContextCard: View {
+    let context: RitualDayContext
+    let changeLocation: (() -> Void)?
+    @Environment(\.cosmicTheme) private var theme
+
+    var body: some View {
+        CosmicGlassCard(cornerRadius: 22) {
+            VStack(alignment: .leading, spacing: 13) {
+                HStack(alignment: .firstTextBaseline) {
+                    Label("Ritual context", systemImage: "sunrise.fill")
+                        .font(.headline)
+                        .foregroundStyle(theme.semanticPrimaryText)
+                    Spacer()
+                    Text("CALCULATED")
+                        .font(.caption2.weight(.black))
+                        .tracking(1.1)
+                        .foregroundStyle(theme.primary)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(context.civilDate)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(theme.semanticPrimaryText)
+                    Text("\(context.locationName) · \(context.timeZoneIdentifier)")
+                        .font(.caption)
+                        .foregroundStyle(theme.semanticSecondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { contextPills }
+                    VStack(alignment: .leading, spacing: 8) { contextPills }
+                }
+                Text("Use these sunrise-anchored facts to confirm timing with your family, temple, or practitioner. They do not make one Pooja universally required today.")
+                    .font(.caption)
+                    .foregroundStyle(theme.semanticSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let changeLocation {
+                    Button(action: changeLocation) {
+                        Label("Change calculation location", systemImage: "mappin.and.ellipse")
+                            .font(.caption.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 42)
+                    }
+                    .buttonStyle(.glass)
+                    .accessibilityHint("Recalculates the ritual context for another saved or offline city")
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("pooja.dayContext")
+    }
+
+    @ViewBuilder
+    private var contextPills: some View {
+        PoojaMetadataPill(text: context.tithiName, symbol: "moonphase.first.quarter")
+        PoojaMetadataPill(text: context.nakshatraName, symbol: "sparkles")
+        PoojaMetadataPill(text: context.sunriseDisclosure, symbol: "sunrise.fill")
+    }
+}
+
+private struct PoojaResumeCard: View {
+    let vidhi: PoojaVidhi
+    let session: RitualSession
+    @Environment(\.cosmicTheme) private var theme
+
+    private var detail: String {
+        switch session.status {
+        case .preparing: return "Continue preparing materials"
+        case .inProgress: return "Resume step \(session.currentStepIndex + 1) of \(vidhi.steps.count)"
+        case .completed: return "Completed"
+        }
+    }
+
+    var body: some View {
+        CosmicGlassCard(cornerRadius: 22, accentBorder: true) {
+            HStack(spacing: 13) {
+                Image(systemName: session.status == .inProgress ? "play.fill" : "checklist")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(theme.selectedControlForeground)
+                    .frame(width: 46, height: 46)
+                    .background(theme.primary, in: Circle())
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Continue your ritual")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(theme.primary)
+                    Text(vidhi.title)
+                        .font(.headline)
+                        .foregroundStyle(theme.semanticPrimaryText)
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(theme.semanticSecondaryText)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(theme.semanticTertiaryText)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Continue \(vidhi.title). \(detail). Progress is saved on this device.")
+    }
+}
+
 private struct PoojaVidhiLibraryCard: View {
     let vidhi: PoojaVidhi
     @Environment(\.cosmicTheme) private var theme
@@ -202,8 +329,11 @@ private struct PoojaVidhiLibraryCard: View {
 
 struct PoojaVidhiDetailView: View {
     let vidhi: PoojaVidhi
-    @State private var preparedMaterialIDs: Set<String> = []
     @Environment(\.cosmicTheme) private var theme
+    @EnvironmentObject private var ritualSessionStore: RitualSessionStore
+
+    private var session: RitualSession { ritualSessionStore.session(for: vidhi) }
+    private var preparedMaterialIDs: Set<String> { session.preparedMaterialIDs }
 
     private var preparationProgress: Double {
         readiness.requiredPreparationProgress
@@ -268,6 +398,12 @@ struct PoojaVidhiDetailView: View {
     }
 
     private var beginActionTitle: String {
+        if session.status == .inProgress {
+            return "Resume step \(session.currentStepIndex + 1) of \(vidhi.steps.count)"
+        }
+        if session.status == .completed {
+            return "Begin this Pooja again"
+        }
         if vidhi.practiceLevel == .priestRecommended {
             return "Open ceremony guide"
         }
@@ -437,11 +573,7 @@ struct PoojaVidhiDetailView: View {
 
                 ForEach(vidhi.materials) { material in
                     Button {
-                        if preparedMaterialIDs.contains(material.id) {
-                            preparedMaterialIDs.remove(material.id)
-                        } else {
-                            preparedMaterialIDs.insert(material.id)
-                        }
+                        ritualSessionStore.toggleMaterial(material.id, for: vidhi)
                     } label: {
                         HStack(alignment: .top, spacing: 12) {
                             Image(systemName: preparedMaterialIDs.contains(material.id) ? "checkmark.circle.fill" : "circle")
@@ -597,11 +729,14 @@ struct PoojaVidhiDetailView: View {
 
 struct GuidedPoojaView: View {
     let vidhi: PoojaVidhi
-    @State private var currentStepIndex = 0
-    @State private var isComplete = false
     @Environment(\.cosmicTheme) private var theme
+    @EnvironmentObject private var ritualSessionStore: RitualSessionStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var session: RitualSession { ritualSessionStore.session(for: vidhi) }
+    private var currentStepIndex: Int { session.currentStepIndex }
+    private var isComplete: Bool { session.status == .completed }
 
     private var currentStep: PoojaStep {
         vidhi.steps[currentStepIndex.clamped(to: 0...(vidhi.steps.count - 1))]
@@ -644,6 +779,11 @@ struct GuidedPoojaView: View {
         .toolbarColorScheme(theme.colorScheme, for: .navigationBar)
         .safeAreaInset(edge: .bottom) {
             if !isComplete { navigationControls }
+        }
+        .onAppear {
+            if session.status != .inProgress {
+                ritualSessionStore.begin(vidhi)
+            }
         }
         .sensoryFeedback(.success, trigger: isComplete)
         .accessibilityIdentifier("pooja.guided.\(vidhi.id)")
@@ -813,7 +953,7 @@ struct GuidedPoojaView: View {
 
     private var previousButton: some View {
         Button {
-            currentStepIndex = max(0, currentStepIndex - 1)
+            ritualSessionStore.previousStep(in: vidhi)
         } label: {
             Label("Previous", systemImage: "chevron.left")
                 .frame(maxWidth: .infinity)
@@ -825,11 +965,7 @@ struct GuidedPoojaView: View {
 
     private var nextButton: some View {
         Button {
-            if currentStepIndex == vidhi.steps.count - 1 {
-                isComplete = true
-            } else {
-                currentStepIndex += 1
-            }
+            ritualSessionStore.advance(in: vidhi)
         } label: {
             Label(
                 currentStepIndex == vidhi.steps.count - 1 ? "Complete" : "Next",
@@ -873,8 +1009,7 @@ struct GuidedPoojaView: View {
             }
 
             Button {
-                currentStepIndex = 0
-                isComplete = false
+                ritualSessionStore.restartGuidedPractice(vidhi)
             } label: {
                 Label("Review from the beginning", systemImage: "arrow.counterclockwise")
                     .frame(maxWidth: .infinity)
@@ -977,6 +1112,7 @@ private extension PoojaCategory {
         .navigationTitle("Pooja")
     }
     .environment(\.cosmicTheme, CosmicColorScheme.obsidianGold)
+    .environmentObject(RitualSessionStore(defaults: nil))
     .preferredColorScheme(.dark)
 }
 
@@ -985,6 +1121,7 @@ private extension PoojaCategory {
         PoojaVidhiDetailView(vidhi: PoojaVidhiCatalog.all[2])
     }
     .environment(\.cosmicTheme, CosmicColorScheme.obsidianGold)
+    .environmentObject(RitualSessionStore(defaults: nil))
     .preferredColorScheme(.dark)
 }
 
@@ -993,5 +1130,6 @@ private extension PoojaCategory {
         GuidedPoojaView(vidhi: PoojaVidhiCatalog.all[1])
     }
     .environment(\.cosmicTheme, CosmicColorScheme.cloudDancer)
+    .environmentObject(RitualSessionStore(defaults: nil))
     .preferredColorScheme(.light)
 }

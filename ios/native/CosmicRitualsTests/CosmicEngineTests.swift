@@ -587,6 +587,84 @@ final class CosmicEngineTests: XCTestCase {
         })
     }
 
+    func testRitualDayContextStatesFactsWithoutInventingAnObservance() {
+        let context = RitualDayContext(
+            civilDate: "Friday, 21 August 2026",
+            locationName: "New Delhi, India",
+            timeZoneIdentifier: "Asia/Kolkata",
+            tithiName: "Navami",
+            nakshatraName: "Anuradha",
+            sunriseTime: "5:53 AM"
+        )
+        XCTAssertEqual(context.sunriseDisclosure, "Sunrise 5:53 AM")
+        let polarContext = RitualDayContext(
+            civilDate: "Sunday, 21 June 2026",
+            locationName: "Longyearbyen, Svalbard",
+            timeZoneIdentifier: "Arctic/Longyearbyen",
+            tithiName: "Saptami",
+            nakshatraName: "Purva Phalguni",
+            sunriseTime: nil
+        )
+        XCTAssertEqual(polarContext.sunriseDisclosure, "Sunrise unavailable at this latitude")
+    }
+
+    @MainActor
+    func testRitualSessionSurvivesRelaunchCompletionAndRestart() throws {
+        let suiteName = "CosmicRitualsTests.RitualSession.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let storageKey = "ritual-session-test"
+        let fixedNow = Date(timeIntervalSince1970: 1_800_000_000)
+        let vidhi = try XCTUnwrap(PoojaVidhiCatalog.vidhi(id: "ganesha-home"))
+        let materialID = try XCTUnwrap(vidhi.materials.first?.id)
+        var store: RitualSessionStore? = RitualSessionStore(
+            defaults: defaults,
+            storageKey: storageKey,
+            now: { fixedNow }
+        )
+        store?.toggleMaterial(materialID, for: vidhi)
+        store?.begin(vidhi)
+        store?.advance(in: vidhi)
+        store?.advance(in: vidhi)
+        var session = try XCTUnwrap(store?.session(for: vidhi))
+        XCTAssertEqual(session.status, .inProgress)
+        XCTAssertEqual(session.currentStepIndex, 2)
+        XCTAssertEqual(session.preparedMaterialIDs, [materialID])
+        XCTAssertEqual(store?.mostRecentUnfinishedSession?.id, vidhi.id)
+        store = RitualSessionStore(defaults: defaults, storageKey: storageKey, now: { fixedNow })
+        session = try XCTUnwrap(store?.session(for: vidhi))
+        XCTAssertEqual(session.status, .inProgress)
+        XCTAssertEqual(session.currentStepIndex, 2)
+        XCTAssertEqual(session.preparedMaterialIDs, [materialID])
+        for _ in 0...vidhi.steps.count { store?.advance(in: vidhi) }
+        session = try XCTUnwrap(store?.session(for: vidhi))
+        XCTAssertEqual(session.status, .completed)
+        XCTAssertEqual(session.currentStepIndex, vidhi.steps.count - 1)
+        XCTAssertNotNil(session.completedAt)
+        XCTAssertNil(store?.mostRecentUnfinishedSession)
+        store?.restartGuidedPractice(vidhi)
+        session = try XCTUnwrap(store?.session(for: vidhi))
+        XCTAssertEqual(session.status, .inProgress)
+        XCTAssertEqual(session.currentStepIndex, 0)
+        XCTAssertNil(session.completedAt)
+        XCTAssertEqual(session.preparedMaterialIDs, [materialID])
+    }
+
+    @MainActor
+    func testRitualSessionRejectsUnknownMaterialAndRecoversFromInvalidStorage() throws {
+        let suiteName = "CosmicRitualsTests.RitualSession.Invalid.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let storageKey = "ritual-session-invalid-test"
+        let vidhi = try XCTUnwrap(PoojaVidhiCatalog.vidhi(id: "daily-panchopachara"))
+        defaults.set(Data("not-json".utf8), forKey: storageKey)
+        let store = RitualSessionStore(defaults: defaults, storageKey: storageKey)
+        XCTAssertTrue(store.sessions.isEmpty)
+        store.toggleMaterial("not-a-catalog-material", for: vidhi)
+        XCTAssertTrue(store.session(for: vidhi).preparedMaterialIDs.isEmpty)
+        XCTAssertNil(store.mostRecentUnfinishedSession)
+    }
+
     func testSubscriptionPolicyRecognizesOnlyConfiguredProductsAndSecureLegalLinks() {
         XCTAssertEqual(Set(SubscriptionCatalog.productIDs).count, 2)
         XCTAssertTrue(SubscriptionCatalog.productIDs.allSatisfy {
@@ -837,6 +915,7 @@ final class CosmicEngineTests: XCTestCase {
     func testPoojaPrimaryScreensRenderAtPhoneAndAccessibilitySizes() async {
         let delhi = context(2026, 7, 24, latitude: 28.6139, longitude: 77.2090, timeZone: "Asia/Kolkata")
         let panchangValue = CosmicEngine.getPanchang(context: delhi)
+        let ritualSessionStore = RitualSessionStore(defaults: nil)
         let panchang = NavigationStack {
             ZStack {
                 RitualSanctuaryBackground()
@@ -866,18 +945,21 @@ final class CosmicEngineTests: XCTestCase {
             .navigationTitle("Pooja")
         }
         .environment(\.cosmicTheme, CosmicColorScheme.obsidianGold)
+        .environmentObject(ritualSessionStore)
         .preferredColorScheme(.dark)
 
         let detail = NavigationStack {
             PoojaVidhiDetailView(vidhi: PoojaVidhiCatalog.all[2])
         }
         .environment(\.cosmicTheme, CosmicColorScheme.obsidianGold)
+        .environmentObject(ritualSessionStore)
         .preferredColorScheme(.dark)
 
         let guided = NavigationStack {
             GuidedPoojaView(vidhi: PoojaVidhiCatalog.all[1])
         }
         .environment(\.cosmicTheme, CosmicColorScheme.cloudDancer)
+        .environmentObject(ritualSessionStore)
         .environment(\.dynamicTypeSize, .accessibility2)
         .preferredColorScheme(.light)
 

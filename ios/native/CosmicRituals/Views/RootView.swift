@@ -6,6 +6,7 @@ import SwiftUI
 struct RootView: View {
     @AppStorage("cosmicThemeVariant") private var variantRaw = CosmicThemeVariant.cosmicDark.rawValue
     @StateObject private var subscriptionStore: SubscriptionStore
+    @StateObject private var ritualSessionStore: RitualSessionStore
     @Environment(\.scenePhase) private var scenePhase
     private let bypassStoreRefresh: Bool
 
@@ -37,11 +38,13 @@ struct RootView: View {
                 listensForTransactions: !initialState.hasPremiumAccess
             )
         )
+        _ritualSessionStore = StateObject(wrappedValue: RitualSessionStore())
     }
 
     init(subscriptionStore: SubscriptionStore) {
         bypassStoreRefresh = true
         _subscriptionStore = StateObject(wrappedValue: subscriptionStore)
+        _ritualSessionStore = StateObject(wrappedValue: RitualSessionStore(defaults: nil))
     }
 
     private var activeScheme: CosmicColorScheme {
@@ -64,6 +67,7 @@ struct RootView: View {
             }
         }
             .environment(\.cosmicTheme, activeScheme)
+            .environmentObject(ritualSessionStore)
             .environment(\.colorScheme, activeScheme.colorScheme)
             .preferredColorScheme(activeScheme.colorScheme)
             .tint(activeScheme.primary)

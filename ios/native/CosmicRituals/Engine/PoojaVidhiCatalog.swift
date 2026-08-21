@@ -207,6 +207,7 @@ struct PoojaVidhi: Identifiable, Hashable, Sendable {
 }
 
 enum PoojaContentPolicy {
+    static let catalogVersion = 1
     static let sourceReviewDate = "2026-07-28"
     static let reviewStatus = "Source-adapted household reference, not a sampradaya-specific certification. Confirm formal rites and received practice with a qualified practitioner."
     static let householdScope = "These are inclusive household reference sequences, not claims of one universal or canonical Pooja Vidhi. Family, temple, regional, and sampradaya practice takes precedence."
