@@ -37,6 +37,10 @@ enum SubscriptionUnavailableReason: Equatable, Sendable {
     case restoreFoundNoEntitlements
 }
 
+/// Thrown when a StoreKit await exceeds its deadline. Distinct from a StoreKit failure so
+/// the reason mapper does not have to guess at a cause that never arrived.
+struct SubscriptionDeadlineExceeded: Error, Equatable {}
+
 enum SubscriptionAccessState: Equatable {
     case checking
     case entitled
@@ -97,6 +101,15 @@ final class SubscriptionStore: ObservableObject {
 
     private var transactionUpdatesTask: Task<Void, Never>?
 
+    /// How long either StoreKit await may take before the refresh gives up. Generous enough
+    /// not to fire on a slow connection, short enough that the user is never stuck.
+    /// Placeholder pending the owner's copy and timing decision.
+    static let defaultEntitlementDeadline: Duration = .seconds(12)   // COPY PENDING
+    static let defaultProductLoadDeadline: Duration = .seconds(12)   // COPY PENDING
+
+    private let entitlementDeadline: Duration
+    private let productLoadDeadline: Duration
+
     /// Serialises refresh passes. See `refresh()`.
     private var refreshTask: Task<Void, Never>?
     private var pendingRefreshCount = 0
@@ -119,8 +132,12 @@ final class SubscriptionStore: ObservableObject {
         },
         syncPurchases: @escaping @Sendable () async throws -> Void = {
             try await AppStore.sync()
-        }
+        },
+        entitlementDeadline: Duration = SubscriptionStore.defaultEntitlementDeadline,
+        productLoadDeadline: Duration = SubscriptionStore.defaultProductLoadDeadline
     ) {
+        self.entitlementDeadline = entitlementDeadline
+        self.productLoadDeadline = productLoadDeadline
         self.loadActiveProductIDs = loadActiveProductIDs
         self.loadProducts = loadProducts
         self.syncPurchases = syncPurchases
@@ -168,18 +185,41 @@ final class SubscriptionStore: ObservableObject {
     }
 
     private func performRefresh() async {
-        if !accessState.hasPremiumAccess {
+        let previousState = accessState
+
+        // Only the states that have nothing to show become `.checking`. An unavailable
+        // screen must not be replaced by a spinner on every retry: that discards the
+        // explanation the user is reading and resets their scroll position.
+        if accessState == .checking || accessState == .locked {
             accessState = .checking
         }
 
-        let activeProductIDs = await loadActiveProductIDs()
+        let activeProductIDs: Set<String>
+        do {
+            activeProductIDs = try await withDeadline(entitlementDeadline) { [loadActiveProductIDs] in
+                await loadActiveProductIDs()
+            }
+        } catch is CancellationError {
+            accessState = previousState
+            return
+        } catch {
+            // The entitlement lookup did not answer. That proves nothing about whether the
+            // user has access, so it must never take access away.
+            accessState = previousState.hasPremiumAccess
+                ? previousState
+                : .storeUnavailable(.storeUnreachable)
+            return
+        }
+
         let hasAccess = SubscriptionEntitlementChecker.grantsAccess(activeProductIDs: activeProductIDs)
         if hasAccess {
             accessState = .entitled
         }
 
         do {
-            let loadedProducts = try await loadProducts(SubscriptionCatalog.productIDs)
+            let loadedProducts = try await withDeadline(productLoadDeadline) { [loadProducts] in
+                try await loadProducts(SubscriptionCatalog.productIDs)
+            }
             products = loadedProducts.sorted(by: productSort)
             isEligibleForRequestedTrial = await hasEligibleRequestedTrial(in: products)
 
@@ -189,11 +229,43 @@ final class SubscriptionStore: ObservableObject {
                     : .locked
             }
         } catch is CancellationError {
+            // Restore what the user was looking at rather than leaving `.checking` written
+            // above as the final state, which stranded the loading overlay permanently.
+            if !hasAccess { accessState = previousState }
             return
         } catch {
+            // A product-load failure never downgrades an entitlement that already arrived.
             if !hasAccess {
-                accessState = .storeUnavailable(Self.unavailableReason(for: error))
+                accessState = .storeUnavailable(
+                    error is SubscriptionDeadlineExceeded
+                        ? .storeUnreachable
+                        : Self.unavailableReason(for: error)
+                )
             }
+        }
+    }
+
+    /// Bounds one await. Without this a StoreKit call that never answers leaves the store in
+    /// `.checking` and `isRefreshing` true for the lifetime of the process, which shows an
+    /// indefinite spinner and disables retry — the one state a user cannot escape.
+    ///
+    /// The two awaits are bounded independently on purpose: a slow product load must not
+    /// cancel an entitlement result that has already arrived.
+    private func withDeadline<T: Sendable>(
+        _ duration: Duration,
+        operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await operation() }
+            group.addTask {
+                try await Task.sleep(for: duration)
+                throw SubscriptionDeadlineExceeded()
+            }
+            defer { group.cancelAll() }
+            guard let first = try await group.next() else {
+                throw SubscriptionDeadlineExceeded()
+            }
+            return first
         }
     }
 

@@ -1,3 +1,4 @@
+import Combine
 import StoreKit
 import XCTest
 @testable import CosmicRituals
@@ -205,6 +206,69 @@ final class SubscriptionRefreshTests: XCTestCase {
         await store.restorePurchases()
 
         XCTAssertEqual(store.accessState, .entitled)
+    }
+
+    // MARK: - B5: .checking must never strand, and a timeout must never revoke access
+
+    /// The state a user cannot escape: an indefinite spinner with retry disabled.
+    func testAnEntitlementLookupThatNeverAnswersEndsInARecoverableStateNotASpinner() async {
+        let store = SubscriptionStore(
+            accessState: .checking,
+            listensForTransactions: false,
+            loadActiveProductIDs: {
+                try? await Task.sleep(for: .seconds(60))
+                return []
+            },
+            loadProducts: { _ in [] },
+            syncPurchases: {},
+            entitlementDeadline: .milliseconds(50),
+            productLoadDeadline: .milliseconds(50)
+        )
+
+        await store.refresh()
+
+        XCTAssertEqual(store.accessState, .storeUnavailable(.storeUnreachable))
+        XCTAssertFalse(store.isRefreshing, "isRefreshing must clear even when StoreKit never answers")
+    }
+
+    func testATimeoutNeverRevokesAccessTheUserAlreadyHas() async {
+        let store = SubscriptionStore(
+            accessState: .entitled,
+            listensForTransactions: false,
+            loadActiveProductIDs: {
+                try? await Task.sleep(for: .seconds(60))
+                return []
+            },
+            loadProducts: { _ in [] },
+            syncPurchases: {},
+            entitlementDeadline: .milliseconds(50),
+            productLoadDeadline: .milliseconds(50)
+        )
+
+        await store.refresh()
+
+        XCTAssertEqual(store.accessState, .entitled, "A lookup that did not answer proves nothing")
+    }
+
+    /// Retrying from an unavailable screen must not replace the explanation with a spinner.
+    func testRefreshFromUnavailableDoesNotPassThroughChecking() async {
+        let observed = UncheckedBox<[SubscriptionAccessState]>([])
+        let store = SubscriptionStore(
+            accessState: .storeUnavailable(.productsMissing),
+            listensForTransactions: false,
+            loadActiveProductIDs: { [] },
+            loadProducts: { _ in [] },
+            syncPurchases: {}
+        )
+        let recorder = store.$accessState.sink { observed.value.append($0) }
+        defer { recorder.cancel() }
+
+        await store.refresh()
+
+        XCTAssertFalse(
+            observed.value.contains(.checking),
+            "Retrying an unavailable screen must not flash the loading overlay; saw \(observed.value)"
+        )
     }
 
     // MARK: - B3: testing access is never widened by any of this
