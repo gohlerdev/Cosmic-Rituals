@@ -14,16 +14,25 @@
 			remoteGlobalIDString = C05B000000000000000000A4;
 			remoteInfo = CosmicRituals;
 		};
+		C05B000000000000000002B0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C05B000000000000000000A1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C05B000000000000000000A4;
+			remoteInfo = CosmicRituals;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		C05B000000000000000000A5 /* CosmicRituals.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CosmicRituals.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C05B000000000000000001A3 /* CosmicRitualsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CosmicRitualsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C05B000000000000000002A3 /* CosmicRitualsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CosmicRitualsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		C05B000000000000000000A6 /* CosmicRituals */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = CosmicRituals; sourceTree = "<group>"; };
 		C05B000000000000000001A6 /* CosmicRitualsTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = CosmicRitualsTests; sourceTree = "<group>"; };
+		C05B000000000000000002A6 /* CosmicRitualsUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = CosmicRitualsUITests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -41,6 +50,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C05B000000000000000002E0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -49,6 +65,7 @@
 			children = (
 				C05B000000000000000000A6 /* CosmicRituals */,
 				C05B000000000000000001A6 /* CosmicRitualsTests */,
+				C05B000000000000000002A6 /* CosmicRitualsUITests */,
 				C05B000000000000000000A3 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -58,6 +75,7 @@
 			children = (
 				C05B000000000000000000A5 /* CosmicRituals.app */,
 				C05B000000000000000001A3 /* CosmicRitualsTests.xctest */,
+				C05B000000000000000002A3 /* CosmicRitualsUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -106,6 +124,27 @@
 			productReference = C05B000000000000000001A3 /* CosmicRitualsTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		C05B000000000000000002A4 /* CosmicRitualsUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C05B000000000000000002C8 /* Build configuration list for PBXNativeTarget "CosmicRitualsUITests" */;
+			buildPhases = (
+				C05B000000000000000002D0 /* Sources */,
+				C05B000000000000000002E0 /* Frameworks */,
+				C05B000000000000000002F0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C05B000000000000000002B1 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C05B000000000000000002A6 /* CosmicRitualsUITests */,
+			);
+			name = CosmicRitualsUITests;
+			productName = CosmicRitualsUITests;
+			productReference = C05B000000000000000002A3 /* CosmicRitualsUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -120,6 +159,10 @@
 						CreatedOnToolsVersion = 16.0;
 					};
 					C05B000000000000000001A4 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = C05B000000000000000000A4;
+					};
+					C05B000000000000000002A4 = {
 						CreatedOnToolsVersion = 26.0;
 						TestTargetID = C05B000000000000000000A4;
 					};
@@ -140,6 +183,7 @@
 			targets = (
 				C05B000000000000000000A4 /* CosmicRituals */,
 				C05B000000000000000001A4 /* CosmicRitualsTests */,
+				C05B000000000000000002A4 /* CosmicRitualsUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -153,6 +197,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C05B000000000000000001F0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C05B000000000000000002F0 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -176,6 +227,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C05B000000000000000002D0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -184,9 +242,59 @@
 			target = C05B000000000000000000A4 /* CosmicRituals */;
 			targetProxy = C05B000000000000000001B0 /* PBXContainerItemProxy */;
 		};
+		C05B000000000000000002B1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C05B000000000000000000A4 /* CosmicRituals */;
+			targetProxy = C05B000000000000000002B0 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		C05B000000000000000002C9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = DJJ824N6RB;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cosmic.rituals.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = CosmicRituals;
+			};
+			name = Debug;
+		};
+		C05B000000000000000002CA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = DJJ824N6RB;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cosmic.rituals.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = CosmicRituals;
+			};
+			name = Release;
+		};
+		C05B000000000000000002CB /* TestFlight */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = DJJ824N6RB;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cosmic.rituals.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = CosmicRituals;
+			};
+			name = TestFlight;
+		};
 		C05B000000000000000000C1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -515,6 +623,16 @@
 				C05B000000000000000001C9 /* Debug */,
 				C05B000000000000000001CA /* Release */,
 				C05B000000000000000001CB /* TestFlight */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C05B000000000000000002C8 /* Build configuration list for PBXNativeTarget "CosmicRitualsUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C05B000000000000000002C9 /* Debug */,
+				C05B000000000000000002CA /* Release */,
+				C05B000000000000000002CB /* TestFlight */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
