@@ -57,6 +57,34 @@ enum SubscriptionAccessState: Equatable {
     }
 }
 
+/// Where a subscription is in its renewal life, as distinct from whether it grants access.
+///
+/// Kept deliberately separate from `SubscriptionAccessState`. Access comes from verified
+/// current entitlements and nothing else; renewal state refines what the user is *told* and
+/// must never widen what they can reach. Making it a separate property rather than a payload
+/// on `.entitled` means that invariant holds by construction — there is no path from a
+/// renewal value to `hasPremiumAccess`.
+enum SubscriptionRenewalPhase: Equatable, Sendable {
+    /// Renewing normally.
+    case subscribed
+    /// A payment failed and Apple is retrying while access continues. The user can still fix
+    /// it, and telling them is the difference between a renewal and a silent lapse.
+    case gracePeriod
+    /// A payment failed, the grace period is over, and access has ended.
+    case billingRetry
+    /// Ran to its end without renewing.
+    case expired
+    /// Refunded or revoked by Apple.
+    case revoked
+    /// No status was available. Never treated as bad news: a lookup that did not answer says
+    /// nothing about the subscription.
+    case unknown
+
+    /// Whether the user should be told something actionable. Grace period is the only phase
+    /// where they still have access *and* something to fix.
+    var needsAttentionWhileEntitled: Bool { self == .gracePeriod }
+}
+
 enum SubscriptionLaunchPolicy {
     static func initialState(
         isUITestingPremium: Bool,
@@ -99,6 +127,9 @@ final class SubscriptionStore: ObservableObject {
     @Published private(set) var isEligibleForRequestedTrial = false
     @Published private(set) var isRefreshing = false
 
+    /// Refines the message only. See `SubscriptionRenewalPhase`.
+    @Published private(set) var renewalPhase: SubscriptionRenewalPhase = .unknown
+
     private var transactionUpdatesTask: Task<Void, Never>?
 
     /// How long either StoreKit await may take before the refresh gives up. Generous enough
@@ -120,6 +151,7 @@ final class SubscriptionStore: ObservableObject {
     private let loadActiveProductIDs: @Sendable () async -> Set<String>
     private let loadProducts: @Sendable ([String]) async throws -> [Product]
     private let syncPurchases: @Sendable () async throws -> Void
+    private let loadRenewalState: @Sendable ([Product]) async -> Product.SubscriptionInfo.RenewalState?
 
     init(
         accessState: SubscriptionAccessState = .checking,
@@ -133,6 +165,9 @@ final class SubscriptionStore: ObservableObject {
         syncPurchases: @escaping @Sendable () async throws -> Void = {
             try await AppStore.sync()
         },
+        loadRenewalState: @escaping @Sendable ([Product]) async -> Product.SubscriptionInfo.RenewalState? = {
+            await SubscriptionStore.currentRenewalState(in: $0)
+        },
         entitlementDeadline: Duration = SubscriptionStore.defaultEntitlementDeadline,
         productLoadDeadline: Duration = SubscriptionStore.defaultProductLoadDeadline
     ) {
@@ -141,6 +176,7 @@ final class SubscriptionStore: ObservableObject {
         self.loadActiveProductIDs = loadActiveProductIDs
         self.loadProducts = loadProducts
         self.syncPurchases = syncPurchases
+        self.loadRenewalState = loadRenewalState
         self.accessState = accessState
         if listensForTransactions {
             transactionUpdatesTask = Task { [weak self] in
@@ -223,6 +259,13 @@ final class SubscriptionStore: ObservableObject {
             products = loadedProducts.sorted(by: productSort)
             isEligibleForRequestedTrial = await hasEligibleRequestedTrial(in: products)
 
+            // Never allowed to change access, only the message. A lookup that fails leaves
+            // the previous phase alone rather than reporting bad news it cannot support.
+            let state = await loadRenewalState(products)
+            if state != nil || renewalPhase == .unknown {
+                renewalPhase = Self.renewalPhase(for: state)
+            }
+
             if !hasAccess {
                 accessState = products.isEmpty
                     ? .storeUnavailable(.productsMissing)
@@ -267,6 +310,41 @@ final class SubscriptionStore: ObservableObject {
             }
             return first
         }
+    }
+
+    /// Maps StoreKit's renewal state onto the phases this app distinguishes.
+    ///
+    /// `RenewalState` is a `RawRepresentable` struct rather than a closed enum, so unknown
+    /// future values are possible and must not be guessed at — they map to `.unknown`, which
+    /// is silent, rather than to anything that would alarm the user.
+    static func renewalPhase(for state: Product.SubscriptionInfo.RenewalState?) -> SubscriptionRenewalPhase {
+        guard let state else { return .unknown }
+        switch state {
+        case .subscribed:            return .subscribed
+        case .inGracePeriod:         return .gracePeriod
+        case .inBillingRetryPeriod:  return .billingRetry
+        case .expired:               return .expired
+        case .revoked:               return .revoked
+        default:                     return .unknown
+        }
+    }
+
+    /// Reads the renewal state from the products already loaded, so no extra network call is
+    /// made and no subscription group identifier is hardcoded. The fixture group id in
+    /// `CosmicRituals.storekit` never reaches App Store Connect, so hardcoding it would work
+    /// in tests and fail in production - the worst possible direction.
+    ///
+    /// Only `.verified` statuses are read. An unverified status is not evidence of anything.
+    static func currentRenewalState(in products: [Product]) async -> Product.SubscriptionInfo.RenewalState? {
+        for product in products {
+            guard let subscription = product.subscription else { continue }
+            guard let statuses = try? await subscription.status else { continue }
+            for status in statuses {
+                guard case .verified = status.transaction else { continue }
+                return status.state
+            }
+        }
+        return nil
     }
 
     /// Distinguishes "you are offline" from "StoreKit itself failed". Anything else is

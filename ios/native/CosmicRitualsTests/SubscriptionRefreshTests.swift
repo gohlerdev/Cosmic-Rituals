@@ -271,6 +271,90 @@ final class SubscriptionRefreshTests: XCTestCase {
         )
     }
 
+    // MARK: - B7: renewal phase refines the message, never the access
+
+    func testRenewalStateMapsToThePhasesTheAppDistinguishes() {
+        XCTAssertEqual(SubscriptionStore.renewalPhase(for: .subscribed), .subscribed)
+        XCTAssertEqual(SubscriptionStore.renewalPhase(for: .inGracePeriod), .gracePeriod)
+        XCTAssertEqual(SubscriptionStore.renewalPhase(for: .inBillingRetryPeriod), .billingRetry)
+        XCTAssertEqual(SubscriptionStore.renewalPhase(for: .expired), .expired)
+        XCTAssertEqual(SubscriptionStore.renewalPhase(for: .revoked), .revoked)
+        XCTAssertEqual(SubscriptionStore.renewalPhase(for: nil), .unknown)
+    }
+
+    /// RenewalState is a RawRepresentable struct, not a closed enum, so a future OS can
+    /// return something this app has never seen. That must be silent, not alarming.
+    func testUnrecognisedRenewalStateIsSilentRatherThanAlarming() {
+        let future = Product.SubscriptionInfo.RenewalState(rawValue: 9_999)
+        XCTAssertEqual(SubscriptionStore.renewalPhase(for: future), .unknown)
+        XCTAssertFalse(SubscriptionRenewalPhase.unknown.needsAttentionWhileEntitled)
+    }
+
+    /// Grace period is the only phase that both keeps access and asks for action.
+    func testOnlyTheGracePeriodAsksTheUserToActWhileStillEntitled() {
+        XCTAssertTrue(SubscriptionRenewalPhase.gracePeriod.needsAttentionWhileEntitled)
+        for phase: SubscriptionRenewalPhase in [.subscribed, .billingRetry, .expired, .revoked, .unknown] {
+            XCTAssertFalse(phase.needsAttentionWhileEntitled, "\(phase) must not nag a user mid-ritual")
+        }
+    }
+
+    /// The invariant that matters: no renewal value can reach `hasPremiumAccess`.
+    func testRenewalPhaseCannotGrantOrRemoveAccess() async {
+        for state in [Product.SubscriptionInfo.RenewalState.expired, .revoked, .inBillingRetryPeriod] {
+            let store = SubscriptionStore(
+                accessState: .checking,
+                listensForTransactions: false,
+                loadActiveProductIDs: { [SubscriptionCatalog.annualProductID] },
+                loadProducts: { _ in [] },
+                syncPurchases: {},
+                loadRenewalState: { _ in state }
+            )
+            await store.refresh()
+            XCTAssertTrue(
+                store.accessState.hasPremiumAccess,
+                "A verified entitlement grants access regardless of renewal state; \(state) removed it"
+            )
+        }
+
+        let noEntitlement = SubscriptionStore(
+            accessState: .checking,
+            listensForTransactions: false,
+            loadActiveProductIDs: { [] },
+            loadProducts: { _ in [] },
+            syncPurchases: {},
+            loadRenewalState: { _ in .subscribed }
+        )
+        await noEntitlement.refresh()
+        XCTAssertFalse(
+            noEntitlement.accessState.hasPremiumAccess,
+            "A healthy renewal state must not manufacture access without an entitlement"
+        )
+    }
+
+    /// A status lookup that fails says nothing, so it must not overwrite what we knew.
+    func testAFailedRenewalLookupDoesNotOverwriteAKnownPhase() async {
+        let phases = UncheckedBox<[Product.SubscriptionInfo.RenewalState?]>([.inGracePeriod, nil])
+        let store = SubscriptionStore(
+            accessState: .checking,
+            listensForTransactions: false,
+            loadActiveProductIDs: { [SubscriptionCatalog.annualProductID] },
+            loadProducts: { _ in [] },
+            syncPurchases: {},
+            loadRenewalState: { _ in
+                var remaining = phases.value
+                let next = remaining.isEmpty ? nil : remaining.removeFirst()
+                phases.value = remaining
+                return next
+            }
+        )
+
+        await store.refresh()
+        XCTAssertEqual(store.renewalPhase, .gracePeriod)
+
+        await store.refresh()
+        XCTAssertEqual(store.renewalPhase, .gracePeriod, "A lookup that did not answer must not clear a known phase")
+    }
+
     // MARK: - B3: testing access is never widened by any of this
 
     func testTestingAccessIsNeverRevokedByAFailedRestore() async {

@@ -65,6 +65,9 @@ struct RootView: View {
                 }
                 #else
                 PanchangView()
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        billingAttentionBanner
+                    }
                 #endif
             } else {
                 SubscriptionGateView(store: subscriptionStore)
@@ -87,6 +90,37 @@ struct RootView: View {
                 guard phase == .active, !bypassStoreRefresh else { return }
                 Task { await subscriptionStore.refresh() }
             }
+    }
+
+    /// Shown only in the grace period: the one phase where the user still has access and
+    /// still has something they can fix. Every other phase is either fine or already over,
+    /// and a banner there would be noise during a ritual.
+    ///
+    /// Copy is factual and promises nothing. Final wording, and whether this appears at all,
+    /// is the owner's call.
+    @ViewBuilder
+    private var billingAttentionBanner: some View {
+        if subscriptionStore.renewalPhase.needsAttentionWhileEntitled {
+            Link(destination: SubscriptionCatalog.manageSubscriptionsURL) {
+                Label(
+                    "Payment issue \u{2014} access continues for now",   // COPY PENDING
+                    systemImage: "exclamationmark.circle"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(activeScheme.semanticPrimaryText)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .padding(.horizontal, 12)
+                .background(.ultraThinMaterial)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(activeScheme.semanticDivider)
+                        .frame(height: 0.5)
+                }
+                .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Payment issue. Your subscription could not renew and access continues for now.")
+            .accessibilityHint("Opens Manage Subscriptions")
+        }
     }
 
     #if TESTFLIGHT_BETA_ACCESS
