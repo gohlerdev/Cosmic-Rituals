@@ -234,7 +234,13 @@ struct RitualSanctuaryBackground: View {
         if reduceTransparency {
             return theme.isLight ? 0.22 : 0.44
         }
-        return theme.isLight ? 0.42 : 0.78
+        // Dark themes only. Measured with Veil Bench against the real sanctuary asset:
+        // at 0.78 the photograph's specular doorway leaves secondary text at 3.21:1 and
+        // tertiary at 2.85:1 on all three dark themes. 0.52 clears AA (4.54:1) without
+        // touching the veil gradient, which keeps the ceremonial composition as designed
+        // and makes the imagery more subordinate to the text, per NEXT_LEVEL_PLAN 5.1.
+        // Light themes already clear AA at 0.42 and are unchanged.
+        return theme.isLight ? 0.42 : 0.52
     }
 
     private var readabilityVeil: [Color] {
