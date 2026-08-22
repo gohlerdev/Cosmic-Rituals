@@ -51,9 +51,16 @@ enum CosmicEngine {
 
     // MARK: - Sun (Meeus §25)
 
+    /// Mean solar longitude (Meeus §25), degrees. Shared with
+    /// `sunriseSunsetUTHours` so the two never carry independently drifting
+    /// approximations of the same quantity.
+    private static func sunMeanLongitudeDegrees(T: Double) -> Double {
+        normalize360(280.46646 + 36000.76983 * T + 0.0003032 * T * T)
+    }
+
     static func sunLongitude(jd: Double) -> Double {
         let T = (jd - J2000) / 36525.0
-        let L0 = normalize360(280.46646 + 36000.76983 * T + 0.0003032 * T * T)
+        let L0 = sunMeanLongitudeDegrees(T: T)
         let M  = normalize360(357.52911 + 35999.05029 * T - 0.0001537 * T * T) * DEG
         let C  = (1.914602 - 0.004817 * T - 0.000014 * T * T) * sin(M)
                 + (0.019993 - 0.000101 * T) * sin(2 * M)
@@ -413,20 +420,29 @@ enum CosmicEngine {
         )
     }
 
-    // MARK: - Sunrise / Sunset (NOAA / Meeus ch.15)
+    // MARK: - Sunrise / Sunset (Meeus ch.15, using the engine's own §25 Sun model)
 
-    /// Returns sunrise and sunset as UTC hour-of-day (e.g. 6.5 = 06:30 UTC)
+    /// Returns sunrise and sunset as UTC hour-of-day (e.g. 6.5 = 06:30 UTC).
+    ///
+    /// Declination and right ascension come from `sunLongitude(jd:)` — the
+    /// same full-series apparent longitude (equation of center to the 3rd
+    /// term, Jupiter/Venus perturbations, nutation/aberration) that tithi,
+    /// nakshatra, yoga, and karana are computed from — rather than a
+    /// separately maintained two-term approximation. The two-term version
+    /// and a fixed 23.4393 degree obliquity are each accurate to roughly
+    /// 0.01 degrees only near J2000; using one Sun model everywhere means
+    /// sunrise/sunset can never quietly disagree with the five limbs about
+    /// where the Sun actually is on a given day.
     static func sunriseSunsetUTHours(year: Int, month: Int, day: Int,
                                      latDeg: Double, lonDeg: Double) -> (rise: Double, set: Double)? {
         let jd0 = julianDate(year: year, month: month, day: day, decimalHour: 0)
-        let n   = jd0 - 2451545.0
-        // Mean solar longitude and mean anomaly
-        let L   = normalize360(280.460  + 0.9856474 * n)
-        let gRad = normalize360(357.528 + 0.9856003 * n) * DEG
-        // Ecliptic longitude
-        let eclRad = normalize360(L + 1.915 * sin(gRad) + 0.020 * sin(2 * gRad)) * DEG
+        let T = (jd0 - J2000) / 36525.0
+        let meanLongitude = sunMeanLongitudeDegrees(T: T)
+        // Mean obliquity of the ecliptic (Meeus §22.2), degrees.
+        let obliquityRad = (23.4392911 - 0.0130042 * T - 0.0000001639 * T * T + 0.0000005036 * T * T * T) * DEG
+        let eclRad = sunLongitude(jd: jd0) * DEG
         // Solar declination
-        let sinDec = sin(23.4393 * DEG) * sin(eclRad)
+        let sinDec = sin(obliquityRad) * sin(eclRad)
         let dec    = asin(sinDec)
         // Hour angle for apparent sunrise (−50' = refraction + disc radius)
         let cosH = (sin(-0.8333 * DEG) - sin(latDeg * DEG) * sin(dec)) /
@@ -434,8 +450,8 @@ enum CosmicEngine {
         guard abs(cosH) <= 1 else { return nil }   // polar day/night
         let H = acos(cosH) * RAD                   // degrees
         // Right ascension for equation of time
-        let RA  = normalize360(atan2(cos(23.4393 * DEG) * sin(eclRad), cos(eclRad)) * RAD)
-        let eqT = normalize180(L - RA) * 4.0      // minutes
+        let RA  = normalize360(atan2(cos(obliquityRad) * sin(eclRad), cos(eclRad)) * RAD)
+        let eqT = normalize180(meanLongitude - RA) * 4.0      // minutes
         // Solar transit in UTC hours
         let noon = 12.0 - lonDeg / 15.0 - eqT / 60.0
         return (noon - H / 15.0, noon + H / 15.0)

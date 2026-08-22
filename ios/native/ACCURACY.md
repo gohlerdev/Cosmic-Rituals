@@ -23,7 +23,7 @@ location-aware calculations and explicit limits over unexplained precision.
 | Sun longitude | Meeus chapter 25 apparent ecliptic longitude | Offline compact ephemeris |
 | Moon longitude | Complete Meeus table 47.A longitude series | Offline compact ephemeris |
 | Sidereal conversion | Lahiri (Chitra Paksha) ayanamsha polynomial | Named in Settings and exports |
-| Sunrise / sunset | NOAA/Meeus solar altitude crossing at -0.8333 degrees | No result for polar day/night |
+| Sunrise / sunset | Meeus chapter 15 solar altitude crossing at -0.8333 degrees, from the same chapter 25 apparent longitude used for the five limbs (not a separately maintained approximation) | No result for polar day/night |
 | Limb transitions | Bracketed 56-step boundary solve for each limb | Tithi, Nakshatra, Yoga, and Karana independently |
 | Muhurta / Choghadiya / Hora | Proportional local day and night divisions | Requires real sunrise, sunset, and next sunrise |
 | Rahu Kala / Yamaganda / Gulika | Weekday-specific eighths of local daylight | Requires real sunrise and sunset |
