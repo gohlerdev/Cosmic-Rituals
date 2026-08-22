@@ -33,9 +33,9 @@ This plan separates product work from distribution work.
 - TestFlight upload, App Store Connect mutation, external tester distribution,
   review submission, pricing changes, subscription activation, and public release
   are separate actions requiring explicit authorization at the time they occur.
-- Build 7 is an internal-testing-only build. Its `TESTFLIGHT_BETA_ACCESS`
+- Builds 7 and 8 are internal-testing-only builds. Their `TESTFLIGHT_BETA_ACCESS`
   compilation condition intentionally bypasses purchases for internal testing.
-  It must never be promoted or repurposed as a public App Store candidate.
+  Neither may ever be promoted or repurposed as a public App Store candidate.
 - A public candidate must use a new build number and the standard `Release`
   configuration without the testing-access condition.
 - The planned 14-day trial must be configured and verified through StoreKit and
@@ -62,11 +62,16 @@ usable ritual flow, a TestFlight installation, or a release approval.
 
 ## 4. Confirmed baseline
 
-The current branch before this plan was
-`codex/cosmic-rituals-modernization`, tracking its origin at commit `caeb325`.
-The recorded TestFlight baseline is version 1.0 build 7, internal testing only.
-Its live App Store Connect state must be reverified before any new distribution
-decision because that state can change independently of this repository.
+The branch before this plan was `codex/cosmic-rituals-modernization`, tracking its
+origin at commit `caeb325`. The current TestFlight baseline is version 1.0 build 8,
+internal testing only. Its uploaded application source snapshot is commit `039158a`;
+later commits record release evidence without changing that uploaded app binary.
+
+On 2026-08-22, signed-in App Store Connect verification showed build 8 upload
+processing `Complete`, a 90-day testing window, and assignment to
+`Cosmic Rituals Internal` with two testers. The external group was not attached,
+and no App Review or public-release action was taken. Installation, first launch
+from TestFlight, and soak remain unverified and are the next distribution gates.
 
 ### 4.1 Shipping product surface
 
@@ -177,11 +182,11 @@ user-experience truth before expanding the app.
 
 - Reverify branch, remote, clean/dirty status, version/build settings, schemes,
   signing identities, subscription product identifiers, and TestFlight groups.
-- Reverify build 7 processing, group assignment, invite count, installability,
+- Reverify build 8 processing, group assignment, invite count, installability,
   and launch behavior in signed-in App Store Connect.
 - Install on at least one current iPhone-class Simulator, one small iPhone
   layout, and one iPad layout; use a physical device when available.
-- Exercise fresh install, upgrade from build 7, app relaunch, force quit,
+- Exercise fresh install, upgrade from build 7 to build 8, app relaunch, force quit,
   airplane mode, denied location, stale GPS, time-zone change, date-line change,
   dark/light appearance, Reduce Motion, and accessibility Dynamic Type.
 - Capture dated screenshots of Panchang, Timing, Muhurtas, Pooja library,
@@ -693,8 +698,8 @@ internal TestFlight archive inspection, real-device evidence, and the phase-spec
 
 ## 10. Immediate next acceptance milestone
 
-When implementation is authorized again, finish and independently verify this
-single vertical slice before adding more catalog breadth:
+The following vertical slice now passes as a six-test Simulator UI suite, including
+force-quit recovery and respectful completion:
 
 > A user chooses one of the twelve reviewed rituals, sees the exact civil
 > date/location/time-zone/sunrise context without a fabricated recommendation,
@@ -702,5 +707,8 @@ single vertical slice before adding more catalog breadth:
 > force quits, reopens the app, resumes at the correct step, completes respectful
 > closure, and can inspect the guide’s safety, source, and tradition boundaries.
 
-Only after that path is visibly successful should the team expand content,
-redesign every surface, or add platform extensions.
+The immediate distribution acceptance gate is to install build 8 from TestFlight on
+an intended tester device and visibly repeat that journey, including first launch,
+offline relaunch, the testing-access label, and correct resume state. Record the device,
+OS, result, and any tester-facing failure before expanding content, redesigning every
+surface, or adding platform extensions.
