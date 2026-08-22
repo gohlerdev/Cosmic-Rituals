@@ -23,15 +23,30 @@ struct RootView: View {
         // product; an inline #if compiles to nothing and cannot be inspected afterwards.
         let isTestingDistribution = ReleaseChannel.isTestingDistribution
 
+        // Unit tests are app-hosted, so this initialiser runs before any test does. Left
+        // alone it immediately calls StoreKit and starts a Transaction.updates listener,
+        // which races an SKTestSession a test has not created yet — the product lookup then
+        // answers from the real store, or from nothing, before the session exists.
+        //
+        // This grants no access and changes no state: it only keeps the host from touching
+        // StoreKit on its own so a test can own that conversation. The variable is absent
+        // outside DEBUG, and UI tests are unaffected because the environment variable lives
+        // in the runner process, not in the app.
+        #if DEBUG
+        let isUnitTestHost = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        #else
+        let isUnitTestHost = false
+        #endif
+
         let initialState = SubscriptionLaunchPolicy.initialState(
             isUITestingPremium: isUITesting,
             isTestingDistribution: isTestingDistribution
         )
-        bypassStoreRefresh = initialState.hasPremiumAccess
+        bypassStoreRefresh = initialState.hasPremiumAccess || isUnitTestHost
         _subscriptionStore = StateObject(
             wrappedValue: SubscriptionStore(
                 accessState: initialState,
-                listensForTransactions: !initialState.hasPremiumAccess
+                listensForTransactions: !initialState.hasPremiumAccess && !isUnitTestHost
             )
         )
         _ritualSessionStore = StateObject(wrappedValue: RitualSessionStore())
