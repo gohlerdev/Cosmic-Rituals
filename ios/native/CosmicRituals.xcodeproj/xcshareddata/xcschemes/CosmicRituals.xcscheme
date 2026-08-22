@@ -63,6 +63,11 @@
                BlueprintName = "CosmicRitualsUITests"
                ReferencedContainer = "container:CosmicRituals.xcodeproj">
             </BuildableReference>
+            <SkippedTests>
+               <Test
+                  Identifier = "ReleaseBoundaryUITests">
+               </Test>
+            </SkippedTests>
          </TestableReference>
       </Testables>
    </TestAction>

@@ -73,10 +73,23 @@ struct RootView: View {
                 SubscriptionGateView(store: subscriptionStore)
             }
         }
-            // Consuming the marker here is what puts it in __TEXT,__cstring, where the
-            // release-boundary inspector can find it after stripping. It is also what the
-            // release-boundary UI test reads, so the evidence is checked two ways.
-            .accessibilityIdentifier(ReleaseChannel.marker)
+            // Keeps the channel marker in __TEXT,__cstring, where the release-boundary
+            // inspector finds it after stripping.
+            //
+            // Deliberately NOT an .accessibilityIdentifier on this view: applied at the root
+            // it replaced the identifiers of everything beneath it, so `subscription.gate`
+            // and the rest vanished from the accessibility tree. The marker is evidence for
+            // a binary inspector, not a UI affordance, and it must not distort the tree the
+            // app's own tests query.
+            .background {
+                // No explicit font: a fixed size here is a real Dynamic Type finding, and
+                // an invisible string is not worth one.
+                Text(verbatim: ReleaseChannel.marker)
+                    .opacity(0)
+                    .frame(width: 0, height: 0)
+                    .accessibilityHidden(true)
+                    .allowsHitTesting(false)
+            }
             .environment(\.cosmicTheme, activeScheme)
             .environmentObject(ritualSessionStore)
             .environment(\.colorScheme, activeScheme.colorScheme)
