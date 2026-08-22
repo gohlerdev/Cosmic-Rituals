@@ -82,10 +82,40 @@ final class PerformanceTests: XCTestCase {
         try XCTSkipIf(cities.isEmpty, "City catalog unavailable in this bundle")
 
         // A short prefix is the worst realistic case: it matches many rows before ranking.
+        // This is the array overload, which rebuilds the index every call - the cost the
+        // location picker used to pay on every keystroke.
         measure(metrics: [XCTClockMetric()]) {
             _ = WorldCityCatalog.search("de", in: cities)
             _ = WorldCityCatalog.search("new", in: cities)
             _ = WorldCityCatalog.search("hyder", in: cities)
+        }
+    }
+
+    /// What a keystroke costs now: the index is built once when the catalog loads, so a
+    /// query is prefix and substring comparisons over prepared keys.
+    func testOfflineCitySearchLatencyWithPreparedIndex() throws {
+        let cities = Self.catalog
+        try XCTSkipIf(cities.isEmpty, "City catalog unavailable in this bundle")
+        let index = WorldCityCatalog.SearchIndex(cities)
+
+        measure(metrics: [XCTClockMetric()]) {
+            _ = WorldCityCatalog.search("de", in: index)
+            _ = WorldCityCatalog.search("new", in: index)
+            _ = WorldCityCatalog.search("hyder", in: index)
+        }
+    }
+
+    func testPreparedIndexReturnsTheSameResultsAsTheArrayOverload() throws {
+        let cities = Self.catalog
+        try XCTSkipIf(cities.isEmpty, "City catalog unavailable in this bundle")
+        let index = WorldCityCatalog.SearchIndex(cities)
+
+        for query in ["de", "new", "hyder", "san", "tokyo", "new delhi", "zz"] {
+            XCTAssertEqual(
+                WorldCityCatalog.search(query, in: index).map(\.id),
+                WorldCityCatalog.search(query, in: cities).map(\.id),
+                "Index and array overloads must agree for '\(query)'"
+            )
         }
     }
 

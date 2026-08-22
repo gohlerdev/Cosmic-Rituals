@@ -125,9 +125,37 @@ enum WorldCityCatalog {
         }
     }
 
+    /// Normalized names and their word splits, computed once when the catalog loads.
+    ///
+    /// Folding 33,909 names is what a keystroke actually costs: the query itself is one
+    /// string, the corpus is the whole catalog. Hoisting that work out of the loop turns
+    /// each search into prefix and substring comparisons over prepared keys.
+    struct SearchIndex: Sendable {
+        let cities: [RitualLocation]
+        fileprivate let keys: [String]
+        fileprivate let words: [[Substring]]
+
+        var count: Int { cities.count }
+
+        init(_ cities: [RitualLocation]) {
+            self.cities = cities
+            var keys: [String] = []
+            var words: [[Substring]] = []
+            keys.reserveCapacity(cities.count)
+            words.reserveCapacity(cities.count)
+            for city in cities {
+                let key = WorldCityCatalog.normalized(city.name)
+                words.append(key.split(whereSeparator: { !$0.isLetter && !$0.isNumber }))
+                keys.append(key)
+            }
+            self.keys = keys
+            self.words = words
+        }
+    }
+
     static func search(
         _ rawQuery: String,
-        in cities: [RitualLocation],
+        in index: SearchIndex,
         limit: Int = resultLimit
     ) -> [RitualLocation] {
         let query = normalized(rawQuery)
@@ -137,20 +165,32 @@ enum WorldCityCatalog {
         var wordPrefix: [RitualLocation] = []
         var contains: [RitualLocation] = []
 
-        for city in cities {
-            let displayName = normalized(city.name)
-            if displayName.hasPrefix(query) {
-                if directPrefix.count < limit { directPrefix.append(city) }
-            } else if displayName
-                .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-                .contains(where: { $0.hasPrefix(query) }) {
-                if wordPrefix.count < limit { wordPrefix.append(city) }
-            } else if displayName.contains(query), contains.count < limit {
-                contains.append(city)
+        for i in index.cities.indices {
+            let key = index.keys[i]
+            if key.hasPrefix(query) {
+                if directPrefix.count < limit { directPrefix.append(index.cities[i]) }
+                // Direct prefix matches are returned ahead of every other bucket, so once
+                // they fill the limit nothing later in the catalog can change the result.
+                if directPrefix.count >= limit { break }
+            } else if index.words[i].contains(where: { $0.hasPrefix(query) }) {
+                if wordPrefix.count < limit { wordPrefix.append(index.cities[i]) }
+            } else if key.contains(query), contains.count < limit {
+                contains.append(index.cities[i])
             }
         }
 
         return Array((directPrefix + wordPrefix + contains).prefix(limit))
+    }
+
+    /// Convenience for callers holding a plain array. Builds the index on every call, so
+    /// anything searching repeatedly - the location picker above all - should keep a
+    /// `SearchIndex` instead.
+    static func search(
+        _ rawQuery: String,
+        in cities: [RitualLocation],
+        limit: Int = resultLimit
+    ) -> [RitualLocation] {
+        search(rawQuery, in: SearchIndex(cities), limit: limit)
     }
 
     static func normalized(_ value: String) -> String {
@@ -228,6 +268,9 @@ final class WorldCityCatalogModel: ObservableObject {
         scheduleSearch(for: query)
     }
 
+    /// Built once per catalog load. Nil until the catalog is available.
+    private var searchIndex: WorldCityCatalog.SearchIndex?
+
     private func load() {
         state = .loading
         guard let resourceURL else {
@@ -250,11 +293,13 @@ final class WorldCityCatalogModel: ObservableObject {
             switch result {
             case .success(let loadedCities):
                 cities = loadedCities
+                searchIndex = WorldCityCatalog.SearchIndex(loadedCities)
                 catalogCount = loadedCities.count
                 state = .loaded
                 scheduleSearch(for: currentQuery)
             case .failure(let message):
                 cities = []
+                searchIndex = nil
                 catalogCount = 0
                 results = []
                 state = .failed(message)
@@ -275,10 +320,12 @@ final class WorldCityCatalogModel: ObservableObject {
             return
         }
 
-        let catalog = cities
+        // Search the prepared index, not the raw array: the whole point of building it at
+        // load time is that a keystroke must not re-fold the catalog.
+        let index = searchIndex
         searchTask = Task { [weak self] in
             let matches = await Task.detached(priority: .userInitiated) {
-                WorldCityCatalog.search(rawQuery, in: catalog)
+                index.map { WorldCityCatalog.search(rawQuery, in: $0) } ?? []
             }.value
 
             guard let self,
