@@ -397,13 +397,23 @@ final class RitualJourneyUITests: XCTestCase {
             XCUIAccessibilityAuditType.contrast.rawValue: 17,
             XCUIAccessibilityAuditType.dynamicType.rawValue: 8,
         ],
-        // guided-practice contrast rose 5 -> 7 when the photograph was dimmed, and the two
-        // additions are carded captions rather than the un-carded pills the change was aimed
-        // at. Recorded as a deliberate trade, not absorbed silently: the same edit removed
-        // five library findings including the worst offenders at roughly 2.79:1. Clearing
-        // these two needs the carded case modelled, which Veil Bench can do but this pass
-        // did not — do that before touching CosmicGlassCard's opacity, because tuning it by
-        // trial moves the two surfaces in opposite directions.
+        // guided-practice contrast rose 5 -> 7 when the photograph was dimmed. Stable across
+        // three runs, and the two additions are carded captions rather than the un-carded
+        // pills the change was aimed at.
+        //
+        // The carded case was then modelled, and the model disagrees with the audit. Text on
+        // CosmicGlassCard over the veil measures 9.37:1 secondary and 7.57:1 tertiary at the
+        // shipped card opacity, worst cell across all three dark themes - and dimming the
+        // photograph improves it to 10.09 and 8.09. Every flagged label uses
+        // theme.semanticSecondaryText; this file has no uses of SwiftUI's dimmer .secondary.
+        // So there is no computable contrast problem on these elements, yet the system audit
+        // reports one, most likely from sampling antialiased .caption glyphs over a textured
+        // card.
+        //
+        // Recorded rather than chased. Do not tune CosmicGlassCard's opacity to move this
+        // number: raising it to 0.92 took guided to 6 and 0.97 took it to 5 while sending
+        // library back from 14 to 19, which is trial-fitting two coupled surfaces against a
+        // measurement that is already suspect.
         "guided-practice": [
             XCUIAccessibilityAuditType.contrast.rawValue: 7,
             XCUIAccessibilityAuditType.dynamicType.rawValue: 2,
