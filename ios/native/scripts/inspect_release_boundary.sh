@@ -83,9 +83,21 @@ else
 fi
 
 # ---------------------------------------------------------------- every slice, not just the first
-SLICES=$(lipo -info "$BINARY" 2>/dev/null | sed -n 's/.*are: //p; s/.*is architecture: //p')
-[ -z "$SLICES" ] && SLICES="(single)"
-note "architectures: $SLICES"
+# A device build is usually a single arch, and a single-arch binary is NOT a fat file -
+# `lipo -thin` fails on it. Distinguish the two cases rather than assuming fat.
+LIPO_INFO=$(lipo -info "$BINARY" 2>/dev/null)
+case "$LIPO_INFO" in
+  *"Non-fat file"*)
+    IS_FAT=0
+    SLICES=$(printf '%s' "$LIPO_INFO" | sed -n 's/.*is architecture: //p')
+    ;;
+  *)
+    IS_FAT=1
+    SLICES=$(printf '%s' "$LIPO_INFO" | sed -n 's/.*are: //p')
+    ;;
+esac
+[ -z "$SLICES" ] && { IS_FAT=0; SLICES="unknown"; }
+note "architectures: $SLICES$([ "$IS_FAT" -eq 0 ] && printf ' (single-architecture binary)')"
 
 WORKDIR=$(mktemp -d)
 trap 'rm -rf "$WORKDIR"' EXIT
@@ -113,8 +125,8 @@ scan_one() {
   fi
 }
 
-if [ "$SLICES" = "(single)" ]; then
-  scan_one "$BINARY" "slice"
+if [ "$IS_FAT" -eq 0 ]; then
+  scan_one "$BINARY" "$SLICES"
 else
   for arch in $SLICES; do
     THIN="$WORKDIR/$arch"

@@ -24,3 +24,6 @@ xcuserdata/
 # CocoaPods / Carthage (unused; ignored if ever added)
 Pods/
 Carthage/Build/
+
+# Local archives and exported ipas — build artifacts, not source
+distribution/
