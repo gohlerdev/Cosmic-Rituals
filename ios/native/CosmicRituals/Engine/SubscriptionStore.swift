@@ -14,12 +14,35 @@ enum SubscriptionCatalog {
     static let requestedTrialDays = 14
 }
 
+/// Why subscription options could not be shown.
+///
+/// The previous `storeUnavailable(String)` carried a prebuilt sentence, which meant an App
+/// Store Connect configuration fault and a dropped Wi-Fi connection told the user the same
+/// thing: check your connection. They are not the same problem and only one of them is the
+/// user's to fix. Carrying the reason instead of the sentence lets the view say something
+/// true, and lets a test assert on the cause rather than on copy.
+enum SubscriptionUnavailableReason: Equatable, Sendable {
+    /// The device could not reach the network at all.
+    case offline
+    /// The network is up but StoreKit failed.
+    case storeUnreachable
+    /// StoreKit answered successfully with no products. Nothing the user can do: the
+    /// products are missing or not yet approved in App Store Connect.
+    case productsMissing
+    /// `AppStore.sync()` threw.
+    case restoreFailed
+    /// `AppStore.sync()` succeeded and found nothing. The usual cause is being signed in to
+    /// a different App Store account than the one that purchased - which StoreKit has no
+    /// error case for, so this is the only signal that it happened.
+    case restoreFoundNoEntitlements
+}
+
 enum SubscriptionAccessState: Equatable {
     case checking
     case entitled
     case testingAccess
     case locked
-    case storeUnavailable(String)
+    case storeUnavailable(SubscriptionUnavailableReason)
 
     var hasPremiumAccess: Bool {
         self == .entitled || self == .testingAccess
@@ -162,22 +185,51 @@ final class SubscriptionStore: ObservableObject {
 
             if !hasAccess {
                 accessState = products.isEmpty
-                    ? .storeUnavailable("Subscriptions are temporarily unavailable. Check your connection and try again.")
+                    ? .storeUnavailable(.productsMissing)
                     : .locked
             }
         } catch is CancellationError {
             return
         } catch {
             if !hasAccess {
-                accessState = .storeUnavailable("The App Store could not load subscription options. Check your connection and try again.")
+                accessState = .storeUnavailable(Self.unavailableReason(for: error))
             }
         }
+    }
+
+    /// Distinguishes "you are offline" from "StoreKit itself failed". Anything else is
+    /// reported as unreachable rather than guessed at.
+    static func unavailableReason(for error: Error) -> SubscriptionUnavailableReason {
+        if let storeKitError = error as? StoreKitError {
+            switch storeKitError {
+            case .networkError(let urlError):
+                switch urlError.code {
+                case .notConnectedToInternet, .dataNotAllowed, .internationalRoamingOff:
+                    return .offline
+                default:
+                    return .storeUnreachable
+                }
+            default:
+                return .storeUnreachable
+            }
+        }
+        if let urlError = error as? URLError, urlError.code == .notConnectedToInternet {
+            return .offline
+        }
+        return .storeUnreachable
     }
 
     func restorePurchases() async {
         do {
             try await syncPurchases()
             await refresh()
+
+            // A sync that succeeds and still finds nothing is the account-mismatch signal:
+            // StoreKit has no error for "signed in to the wrong Apple Account", so silence
+            // here is the only evidence. Never overwrite access the user actually has.
+            if !accessState.hasPremiumAccess {
+                accessState = .storeUnavailable(.restoreFoundNoEntitlements)
+            }
         } catch is CancellationError {
             return
         } catch StoreKitError.userCancelled {
@@ -187,7 +239,7 @@ final class SubscriptionStore: ObservableObject {
             // A restore that fails must never take away access the user already has: the
             // entitlement was verified locally and does not depend on this sync succeeding.
             guard !accessState.hasPremiumAccess else { return }
-            accessState = .storeUnavailable("Purchases could not be restored. Confirm the App Store account and try again.")
+            accessState = .storeUnavailable(.restoreFailed)
         }
     }
 

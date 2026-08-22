@@ -131,6 +131,82 @@ final class SubscriptionRefreshTests: XCTestCase {
         XCTAssertEqual(store.accessState, .locked, "A dismissed restore must leave the state alone")
     }
 
+    // MARK: - B4: the reason must be the cause, not a guess
+
+    /// The split that matters: StoreKit answering successfully with zero products is an App
+    /// Store Connect configuration fault, and telling that user to check their connection
+    /// sends them to fix something that is not broken.
+    func testEmptyProductListIsReportedAsConfigurationNotConnectivity() async {
+        let store = SubscriptionStore(
+            accessState: .checking,
+            listensForTransactions: false,
+            loadActiveProductIDs: { [] },
+            loadProducts: { _ in [] },
+            syncPurchases: {}
+        )
+
+        await store.refresh()
+
+        XCTAssertEqual(store.accessState, .storeUnavailable(.productsMissing))
+    }
+
+    func testUnavailableReasonSeparatesOfflineFromStoreFailure() {
+        XCTAssertEqual(
+            SubscriptionStore.unavailableReason(for: StoreKitError.networkError(URLError(.notConnectedToInternet))),
+            .offline
+        )
+        XCTAssertEqual(
+            SubscriptionStore.unavailableReason(for: StoreKitError.networkError(URLError(.badServerResponse))),
+            .storeUnreachable
+        )
+        XCTAssertEqual(SubscriptionStore.unavailableReason(for: StoreKitError.systemError(URLError(.unknown))), .storeUnreachable)
+        XCTAssertEqual(SubscriptionStore.unavailableReason(for: URLError(.notConnectedToInternet)), .offline)
+    }
+
+    func testFailedRestoreFromLockedReportsRestoreFailedSpecifically() async {
+        let store = SubscriptionStore(
+            accessState: .locked,
+            listensForTransactions: false,
+            loadActiveProductIDs: { [] },
+            loadProducts: { _ in [] },
+            syncPurchases: { throw StoreKitError.networkError(URLError(.notConnectedToInternet)) }
+        )
+
+        await store.restorePurchases()
+
+        XCTAssertEqual(store.accessState, .storeUnavailable(.restoreFailed))
+    }
+
+    /// A restore that succeeds and finds nothing is the only signal StoreKit gives that the
+    /// user is signed in to a different Apple Account than the one that purchased.
+    func testSuccessfulRestoreThatFindsNothingReportsNoEntitlements() async {
+        let store = SubscriptionStore(
+            accessState: .locked,
+            listensForTransactions: false,
+            loadActiveProductIDs: { [] },
+            loadProducts: { _ in [] },
+            syncPurchases: {}
+        )
+
+        await store.restorePurchases()
+
+        XCTAssertEqual(store.accessState, .storeUnavailable(.restoreFoundNoEntitlements))
+    }
+
+    func testSuccessfulRestoreThatFindsAnEntitlementDoesNotReportNoEntitlements() async {
+        let store = SubscriptionStore(
+            accessState: .locked,
+            listensForTransactions: false,
+            loadActiveProductIDs: { [SubscriptionCatalog.annualProductID] },
+            loadProducts: { _ in [] },
+            syncPurchases: {}
+        )
+
+        await store.restorePurchases()
+
+        XCTAssertEqual(store.accessState, .entitled)
+    }
+
     // MARK: - B3: testing access is never widened by any of this
 
     func testTestingAccessIsNeverRevokedByAFailedRestore() async {

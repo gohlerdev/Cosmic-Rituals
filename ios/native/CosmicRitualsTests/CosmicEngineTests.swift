@@ -709,7 +709,7 @@ final class CosmicEngineTests: XCTestCase {
         XCTAssertTrue(SubscriptionAccessState.testingAccess.hasPremiumAccess)
         XCTAssertTrue(SubscriptionAccessState.testingAccess.isTestingAccess)
         XCTAssertFalse(SubscriptionAccessState.entitled.isTestingAccess)
-        XCTAssertFalse(SubscriptionAccessState.storeUnavailable("offline").hasPremiumAccess)
+        XCTAssertFalse(SubscriptionAccessState.storeUnavailable(.offline).hasPremiumAccess)
     }
 
     func testStoreKitConfigurationDeclaresTwoWeekTrialsForEveryProduct() throws {

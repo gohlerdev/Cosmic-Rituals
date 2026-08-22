@@ -9,8 +9,8 @@ struct SubscriptionGateView: View {
         ZStack {
             RitualSanctuaryBackground()
             switch store.accessState {
-            case .storeUnavailable(let message):
-                unavailableView(message: message)
+            case .storeUnavailable(let reason):
+                unavailableView(reason: reason)
             case .checking, .locked, .entitled, .testingAccess:
                 subscriptionStoreView
             }
@@ -101,38 +101,75 @@ struct SubscriptionGateView: View {
         .accessibilityLabel("Checking App Store access")
     }
 
-    private func unavailableView(message: String) -> some View {
+    /// Copy is intentionally minimal and factual per reason. Final wording is pending the
+    /// owner's decision on whether an unpurchased offline user reaches any content at all;
+    /// nothing here reassures the user about something the app cannot actually deliver.
+    private func unavailableCopy(
+        for reason: SubscriptionUnavailableReason
+    ) -> (symbol: String, headline: String, body: String) {
+        switch reason {
+        case .offline:
+            return ("wifi.exclamationmark",
+                    "No connection",                       // COPY PENDING
+                    "Starting a subscription needs a connection. Everything you have already unlocked stays available offline.")
+        case .storeUnreachable:
+            return ("exclamationmark.icloud",
+                    "The App Store did not respond",       // COPY PENDING
+                    "This is on Apple's side, not yours. Try again in a moment.")
+        case .productsMissing:
+            return ("questionmark.circle",
+                    "Subscriptions are not available yet", // COPY PENDING
+                    "The App Store connected but returned no subscription options. Retrying will not help; this needs fixing on our side.")
+        case .restoreFailed:
+            return ("arrow.clockwise.circle",
+                    "Restore did not finish",              // COPY PENDING
+                    "The App Store could not complete the restore. Try again, or check you are signed in to the Apple Account that made the purchase.")
+        case .restoreFoundNoEntitlements:
+            return ("person.crop.circle.badge.questionmark",
+                    "No purchases found",                  // COPY PENDING
+                    "This Apple Account has no Cosmic Rituals subscription. If you purchased with a different account, sign in to that one and restore again.")
+        }
+    }
+
+    private func unavailableView(reason: SubscriptionUnavailableReason) -> some View {
+        let copy = unavailableCopy(for: reason)
+        return
         ScrollView {
             VStack(spacing: 24) {
                 marketingHeader
 
                 VStack(spacing: 14) {
-                    Image(systemName: "wifi.exclamationmark")
+                    Image(systemName: copy.symbol)
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(theme.primary)
                         .accessibilityHidden(true)
 
-                    Text("The App Store is unavailable")
+                    Text(copy.headline)
                         .font(.title3.bold())
                         .foregroundStyle(theme.semanticPrimaryText)
 
-                    Text(message)
+                    Text(copy.body)
                         .font(.subheadline)
                         .foregroundStyle(theme.semanticSecondaryText)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Button {
-                        Task { await store.refresh() }
-                    } label: {
-                        Label("Try again", systemImage: "arrow.clockwise")
-                            .frame(maxWidth: .infinity)
-                            .frame(minHeight: 44)
+                    // No retry for a configuration fault: the request already succeeded, so
+                    // offering to try again invites the user to keep paying for a failure
+                    // that is not theirs and cannot resolve on this device.
+                    if reason != .productsMissing {
+                        Button {
+                            Task { await store.refresh() }
+                        } label: {
+                            Label("Try again", systemImage: "arrow.clockwise")
+                                .frame(maxWidth: .infinity)
+                                .frame(minHeight: 44)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .tint(theme.primary)
+                        .foregroundStyle(theme.selectedControlForeground)
+                        .disabled(store.isRefreshing)
                     }
-                    .buttonStyle(.glassProminent)
-                    .tint(theme.primary)
-                    .foregroundStyle(theme.selectedControlForeground)
-                    .disabled(store.isRefreshing)
 
                     Button("Restore purchases") {
                         Task { await store.restorePurchases() }
@@ -141,7 +178,7 @@ struct SubscriptionGateView: View {
                     .frame(minHeight: 44)
                     .disabled(store.isRefreshing)
 
-                    Text("A connection is required to start a subscription. Existing verified access is preserved when product information cannot load.")
+                    Text("Existing verified access is preserved when product information cannot load.")
                         .font(.caption)
                         .foregroundStyle(theme.semanticSecondaryText)
                         .multilineTextAlignment(.center)
@@ -192,7 +229,7 @@ struct SubscriptionGateView: View {
 #Preview("Store unavailable") {
     SubscriptionGateView(
         store: SubscriptionStore(
-            accessState: .storeUnavailable("The App Store could not load subscription options."),
+            accessState: .storeUnavailable(.productsMissing),
             listensForTransactions: false
         )
     )
