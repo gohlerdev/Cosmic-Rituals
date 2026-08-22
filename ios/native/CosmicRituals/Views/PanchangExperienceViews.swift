@@ -948,6 +948,8 @@ private struct PanchangExperienceRow: View {
                 }
             }
             .padding(.vertical, 12)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
 
             if !isLast {
                 Divider().padding(.leading, 41)
@@ -1002,6 +1004,8 @@ private struct LedgerLimbRow: View {
                 }
             }
             .padding(.vertical, 12)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
             if !isLast { Divider() }
         }
     }

@@ -404,6 +404,13 @@ struct PanchangView: View {
                             currentMuhurtaBanner(current)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(
+                            "Active now, muhurta \(current.id), \(current.name), \(current.quality.rawValue), " +
+                            "\(shortTime(current.startTime)) to \(shortTime(current.endTime)), " +
+                            "\(current.isDay ? "day" : "night") muhurta, \(current.purpose)"
+                        )
+                        .accessibilityHint("Opens muhurta details")
                         .padding(.horizontal)
                     }
 
@@ -640,10 +647,10 @@ struct PanchangView: View {
         let inauspicious = muhurtas.filter { $0.quality == .inauspicious }.count
 
         return HStack(spacing: 8) {
-            MuhurtaSummaryPill(label: "★★ Excellent",  count: excellent,    color: .yellow)
-            MuhurtaSummaryPill(label: "★ Auspicious",  count: auspicious,   color: .green)
-            MuhurtaSummaryPill(label: "◐ Mixed",       count: mixed,        color: .orange)
-            MuhurtaSummaryPill(label: "✕ Avoid",       count: inauspicious, color: .red)
+            MuhurtaSummaryPill(label: "★★ Excellent",  spokenLabel: "excellent",   count: excellent,    color: .yellow)
+            MuhurtaSummaryPill(label: "★ Auspicious",  spokenLabel: "auspicious",  count: auspicious,   color: .green)
+            MuhurtaSummaryPill(label: "◐ Mixed",       spokenLabel: "mixed",       count: mixed,        color: .orange)
+            MuhurtaSummaryPill(label: "✕ Avoid",       spokenLabel: "to avoid",    count: inauspicious, color: .red)
         }
     }
 
@@ -833,11 +840,14 @@ struct PanchangView: View {
     private func solarTimeCell(icon: String, color: Color, label: String, time: Date) -> some View {
         VStack(spacing: 4) {
             Image(systemName: icon).font(.headline).foregroundStyle(color)
+                .accessibilityHidden(true)
             Text(label).font(.caption2).foregroundStyle(.tertiary)
             Text(shortTime(time))
                 .font(.subheadline.bold()).monospacedDigit()
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label) \(shortTime(time))")
     }
 
     private func shortTime(_ date: Date) -> String {
@@ -956,17 +966,26 @@ private struct ThemePickerSheet: View {
                             Text("Subscription & Support")
                                 .font(.caption.bold())
                                 .foregroundStyle(theme.semanticSecondaryText)
+                                .padding(.bottom, 6)
                             Link(destination: SubscriptionCatalog.manageSubscriptionsURL) {
                                 Label("Manage subscription", systemImage: "creditcard.fill")
+                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                    .contentShape(Rectangle())
                             }
                             Link(destination: SubscriptionCatalog.privacyPolicyURL) {
                                 Label("Privacy policy", systemImage: "hand.raised.fill")
+                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                    .contentShape(Rectangle())
                             }
                             Link(destination: SubscriptionCatalog.termsOfUseURL) {
                                 Label("Terms of use", systemImage: "doc.text.fill")
+                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                    .contentShape(Rectangle())
                             }
                             Link(destination: SubscriptionCatalog.supportURL) {
                                 Label("Support", systemImage: "questionmark.circle.fill")
+                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                    .contentShape(Rectangle())
                             }
                         }
                         .font(.caption)
@@ -1030,6 +1049,9 @@ private struct ThemePickerSheet: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(variant.displayName) theme, \(scheme.isLight ? "light appearance" : "dark appearance")")
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func integrityRow(title: String, detail: String) -> some View {
@@ -1124,11 +1146,23 @@ struct MuhurtaRow: View {
         .padding(.horizontal, 4)
         .background(muhurta.isCurrent ? theme.primary.opacity(0.08) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spokenSummary)
+        .accessibilityHint("Opens muhurta details")
+    }
+
+    private var spokenSummary: String {
+        var parts = ["Muhurta \(muhurta.id)", muhurta.name, muhurta.quality.rawValue]
+        if muhurta.isCurrent { parts.append("active now") }
+        parts.append("\(muhurta.startTime.ritualShortTime(in: timeZone)) to \(muhurta.endTime.ritualShortTime(in: timeZone))")
+        parts.append(muhurta.purpose)
+        return parts.joined(separator: ", ")
     }
 }
 
 struct MuhurtaSummaryPill: View {
     let label: String
+    let spokenLabel: String
     let count: Int
     let color: Color
 
@@ -1140,5 +1174,7 @@ struct MuhurtaSummaryPill: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(count) \(spokenLabel) \(count == 1 ? "muhurta" : "muhurtas")")
     }
 }

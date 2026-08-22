@@ -156,11 +156,14 @@ struct MuhurtaDetailView: View {
                         .foregroundStyle(color)
                         .frame(width: 16)
                         .padding(.top, 2)
+                        .accessibilityHidden(true)
                     Text(item)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(title), \(item)")
             }
         }
     }

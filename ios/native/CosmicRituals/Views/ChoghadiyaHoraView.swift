@@ -240,6 +240,20 @@ struct ChoghadiyaRow: View {
         .padding(.vertical, 2)
         .background(item.isCurrent ? color(item.quality).opacity(0.08) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spokenSummary)
+        .accessibilityValue("\(item.startTime.ritualShortTime(in: timeZone)) to \(item.endTime.ritualShortTime(in: timeZone))")
+    }
+
+    private var spokenSummary: String {
+        var parts = [
+            item.quality.rawValue,
+            item.quality.muhurtaQuality.rawValue,
+            item.quality.detail,
+            item.quality.planet.rawValue
+        ]
+        if item.isCurrent { parts.insert("Now", at: 0) }
+        return parts.joined(separator: ", ")
     }
 }
 

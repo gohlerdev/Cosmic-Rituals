@@ -152,13 +152,24 @@ struct SubscriptionGateView: View {
                 .accessibilityElement(children: .contain)
 
                 HStack(spacing: 18) {
-                    Link("Privacy", destination: SubscriptionCatalog.privacyPolicyURL)
-                    Link("Terms", destination: SubscriptionCatalog.termsOfUseURL)
-                    Link("Support", destination: SubscriptionCatalog.supportURL)
+                    Link(destination: SubscriptionCatalog.privacyPolicyURL) {
+                        Text("Privacy")
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    Link(destination: SubscriptionCatalog.termsOfUseURL) {
+                        Text("Terms")
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    Link(destination: SubscriptionCatalog.supportURL) {
+                        Text("Support")
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
                 }
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(theme.semanticSecondaryText)
-                .frame(minHeight: 44)
             }
             .frame(maxWidth: 620)
             .padding(.horizontal, 18)

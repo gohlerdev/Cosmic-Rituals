@@ -173,6 +173,7 @@ private struct RitualDayContextCard: View {
     let context: RitualDayContext
     let changeLocation: (() -> Void)?
     @Environment(\.cosmicTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         CosmicGlassCard(cornerRadius: 22) {
@@ -191,14 +192,29 @@ private struct RitualDayContextCard: View {
                     Text(context.civilDate)
                         .font(.title3.weight(.bold))
                         .foregroundStyle(theme.semanticPrimaryText)
-                    Text("\(context.locationName) · \(context.timeZoneIdentifier)")
-                        .font(.caption)
-                        .foregroundStyle(theme.semanticSecondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
+                    ForEach(
+                        Array(
+                            RitualResponsiveLayout.locationMetadataLines(
+                                sourceDescription: context.locationName,
+                                timeZoneIdentifier: context.timeZoneIdentifier,
+                                for: dynamicTypeSize
+                            ).enumerated()
+                        ),
+                        id: \.offset
+                    ) { _, line in
+                        Text(line)
+                            .font(.caption)
+                            .foregroundStyle(theme.semanticSecondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) { contextPills }
+                if dynamicTypeSize > .large {
                     VStack(alignment: .leading, spacing: 8) { contextPills }
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) { contextPills }
+                        VStack(alignment: .leading, spacing: 8) { contextPills }
+                    }
                 }
                 Text("Use these sunrise-anchored facts to confirm timing with your family, temple, or practitioner. They do not make one Pooja universally required today.")
                     .font(.caption)
@@ -477,8 +493,7 @@ struct PoojaVidhiDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 ProgressView(value: readiness.requiredPreparationProgress)
                     .tint(readiness.hasPreparedRequiredMaterials ? .green : theme.primary)
-                    .accessibilityLabel("Required material readiness")
-                    .accessibilityValue(readiness.materialStatus)
+                    .accessibilityHidden(true)
 
                 readinessRow(
                     title: "Materials",
@@ -560,8 +575,7 @@ struct PoojaVidhiDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 ProgressView(value: preparationProgress)
                     .tint(theme.primary)
-                    .accessibilityLabel("Required materials prepared")
-                    .accessibilityValue(readiness.materialStatus)
+                    .accessibilityHidden(true)
 
                 HStack {
                     Text("Required \(readiness.preparedRequiredMaterialCount)/\(readiness.requiredMaterialCount)")
@@ -570,6 +584,9 @@ struct PoojaVidhiDetailView: View {
                 }
                 .font(.caption2.monospacedDigit().weight(.semibold))
                 .foregroundStyle(theme.semanticTertiaryText)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Materials prepared")
+                .accessibilityValue("\(readiness.preparedRequiredMaterialCount) of \(readiness.requiredMaterialCount) required, \(readiness.preparedOptionalMaterialCount) of \(readiness.optionalMaterialCount) optional")
 
                 ForEach(vidhi.materials) { material in
                     Button {
@@ -586,7 +603,7 @@ struct PoojaVidhiDetailView: View {
                                         .foregroundStyle(theme.semanticPrimaryText)
                                     if material.isRequired {
                                         Text("REQUIRED")
-                                            .font(.system(size: 9, weight: .bold))
+                                            .font(.caption2.weight(.bold))
                                             .foregroundStyle(.orange)
                                     }
                                 }
@@ -806,10 +823,12 @@ struct GuidedPoojaView: View {
                         .font(.caption.monospacedDigit().weight(.bold))
                         .foregroundStyle(theme.primary)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Pooja progress. \(vidhi.title). \(isComplete ? "Respectful closure" : currentStep.title)")
+                .accessibilityValue(isComplete ? "Complete" : "Step \(currentStep.number) of \(vidhi.steps.count)")
                 ProgressView(value: isComplete ? 1 : Double(currentStep.number), total: Double(vidhi.steps.count))
                     .tint(theme.primary)
-                    .accessibilityLabel("Pooja progress")
-                    .accessibilityValue(isComplete ? "Complete" : "Step \(currentStep.number) of \(vidhi.steps.count)")
+                    .accessibilityHidden(true)
 
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 7) {
@@ -1049,6 +1068,7 @@ private struct PoojaMetadataPill: View {
     var body: some View {
         Label(text, systemImage: symbol)
             .font(.caption2.weight(.semibold))
+            .fixedSize(horizontal: false, vertical: true)
             .foregroundStyle(theme.semanticSecondaryText)
             .padding(.horizontal, 9)
             .padding(.vertical, 6)

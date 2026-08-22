@@ -54,8 +54,8 @@ struct CosmicColorScheme: Sendable {
     /// dark system label colors while the user switches to a light app theme.
     /// Dark variants continue using the existing system semantics unchanged.
     var semanticPrimaryText: Color { onSurface }
-    var semanticSecondaryText: Color { onSurface.opacity(isLight ? 0.72 : 0.76) }
-    var semanticTertiaryText: Color { onSurface.opacity(isLight ? 0.60 : 0.62) }
+    var semanticSecondaryText: Color { onSurface.opacity(isLight ? 0.80 : 0.82) }
+    var semanticTertiaryText: Color { onSurface.opacity(isLight ? 0.70 : 0.72) }
     var semanticDivider: Color { isLight ? onSurface.opacity(0.16) : Color.white.opacity(0.10) }
     var semanticBorder: Color { isLight ? onSurface.opacity(0.22) : Color.white.opacity(0.10) }
     var semanticHighlight: Color { isLight ? onSurface.opacity(0.08) : Color.white.opacity(0.20) }
@@ -873,12 +873,15 @@ private struct CosmicSegmentButton: View {
             }
             .buttonStyle(.glassProminent)
             .tint(theme.primary)
+            .accessibilityLabel(title)
+            .accessibilityAddTraits(.isSelected)
         } else {
             Button(action: action) {
                 segmentLabel
             }
             .buttonStyle(.glass)
             .tint(theme.onSurface.opacity(0.80))
+            .accessibilityLabel(title)
         }
     }
 
@@ -892,6 +895,7 @@ private struct CosmicSegmentButton: View {
                 .lineLimit(1)
         }
         .padding(.horizontal, icon.isEmpty ? 6 : 2)
+        .frame(minHeight: 30)
     }
 }
 
