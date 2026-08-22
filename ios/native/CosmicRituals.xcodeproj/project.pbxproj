@@ -87,6 +87,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = C05B000000000000000000C8 /* Build configuration list for PBXNativeTarget "CosmicRituals" */;
 			buildPhases = (
+				C05B000000000000000003D0 /* Release boundary guard */,
 				C05B000000000000000000D0 /* Sources */,
 				C05B000000000000000000E0 /* Frameworks */,
 				C05B000000000000000000F0 /* Resources */,
@@ -212,6 +213,24 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		C05B000000000000000003D0 /* Release boundary guard */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Release boundary guard";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Fails the build when the configuration and the testing-access flag disagree.\n# This catches the mistake at compile time; scripts/inspect_release_boundary.sh checks the\n# finished product, because this phase cannot see an operator who also overrides\n# CONFIGURATION on the command line.\nset -u\nFLAGS=\"${SWIFT_ACTIVE_COMPILATION_CONDITIONS:-} ${OTHER_SWIFT_FLAGS:-}\"\ncase \"$FLAGS\" in\n  *TESTFLIGHT_BETA_ACCESS*) HAS_BYPASS=1 ;;\n  *) HAS_BYPASS=0 ;;\nesac\n\nif [ \"$CONFIGURATION\" = \"TestFlight\" ]; then\n  if [ \"$HAS_BYPASS\" -eq 0 ]; then\n    echo \"error: TestFlight configuration is missing TESTFLIGHT_BETA_ACCESS; internal testers would hit the paywall.\"\n    exit 1\n  fi\nelse\n  if [ \"$HAS_BYPASS\" -eq 1 ]; then\n    echo \"error: TESTFLIGHT_BETA_ACCESS is set in the $CONFIGURATION configuration. This build bypasses purchase and must never be distributed publicly.\"\n    exit 1\n  fi\nfi\n\nif [ \"$CONFIGURATION\" = \"Release\" ] && [ \"${ENABLE_TESTABILITY:-NO}\" = \"YES\" ]; then\n  echo \"error: ENABLE_TESTABILITY is YES in Release.\"\n  exit 1\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		C05B000000000000000000D0 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -250,51 +269,6 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		C05B000000000000000002C9 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = DJJ824N6RB;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cosmic.rituals.uitests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = CosmicRituals;
-			};
-			name = Debug;
-		};
-		C05B000000000000000002CA /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = DJJ824N6RB;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cosmic.rituals.uitests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = CosmicRituals;
-			};
-			name = Release;
-		};
-		C05B000000000000000002CB /* TestFlight */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = DJJ824N6RB;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cosmic.rituals.uitests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = CosmicRituals;
-			};
-			name = TestFlight;
-		};
 		C05B000000000000000000C1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -591,6 +565,51 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CosmicRituals.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CosmicRituals";
+			};
+			name = TestFlight;
+		};
+		C05B000000000000000002C9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = DJJ824N6RB;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cosmic.rituals.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = CosmicRituals;
+			};
+			name = Debug;
+		};
+		C05B000000000000000002CA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = DJJ824N6RB;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cosmic.rituals.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = CosmicRituals;
+			};
+			name = Release;
+		};
+		C05B000000000000000002CB /* TestFlight */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = DJJ824N6RB;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cosmic.rituals.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = CosmicRituals;
 			};
 			name = TestFlight;
 		};

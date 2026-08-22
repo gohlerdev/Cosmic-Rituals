@@ -19,13 +19,9 @@ struct RootView: View {
         let isUITesting = false
         #endif
 
-        // This condition exists only in the dedicated testing distribution
-        // configuration. The production Release configuration never defines it.
-        #if TESTFLIGHT_BETA_ACCESS
-        let isTestingDistribution = true
-        #else
-        let isTestingDistribution = false
-        #endif
+        // Owned by ReleaseChannel so the choice leaves detectable evidence in the built
+        // product; an inline #if compiles to nothing and cannot be inspected afterwards.
+        let isTestingDistribution = ReleaseChannel.isTestingDistribution
 
         let initialState = SubscriptionLaunchPolicy.initialState(
             isUITestingPremium: isUITesting,
@@ -54,6 +50,11 @@ struct RootView: View {
     var body: some View {
         Group {
             if subscriptionStore.accessState.hasPremiumAccess {
+                // The banner and its copy are fenced out of every non-testing build. It was
+                // already unreachable in Release, but the string still shipped, and a
+                // Release binary containing "TestFlight testing access" is exactly the
+                // evidence a release audit should never have to explain away.
+                #if TESTFLIGHT_BETA_ACCESS
                 if subscriptionStore.accessState.isTestingAccess {
                     PanchangView()
                         .safeAreaInset(edge: .top, spacing: 0) {
@@ -62,10 +63,17 @@ struct RootView: View {
                 } else {
                     PanchangView()
                 }
+                #else
+                PanchangView()
+                #endif
             } else {
                 SubscriptionGateView(store: subscriptionStore)
             }
         }
+            // Consuming the marker here is what puts it in __TEXT,__cstring, where the
+            // release-boundary inspector can find it after stripping. It is also what the
+            // release-boundary UI test reads, so the evidence is checked two ways.
+            .accessibilityIdentifier(ReleaseChannel.marker)
             .environment(\.cosmicTheme, activeScheme)
             .environmentObject(ritualSessionStore)
             .environment(\.colorScheme, activeScheme.colorScheme)
@@ -81,6 +89,7 @@ struct RootView: View {
             }
     }
 
+    #if TESTFLIGHT_BETA_ACCESS
     private var testingAccessBanner: some View {
         Label("TestFlight testing access", systemImage: "testtube.2")
             .font(.caption.weight(.semibold))
@@ -94,8 +103,9 @@ struct RootView: View {
                     .fill(activeScheme.semanticDivider)
                     .frame(height: 0.5)
             }
-            .accessibilityLabel("TestFlight testing access. Purchases are not required in this testing build.")
+            .accessibilityLabel("TestFlight testing access. Purchases are not required in this testing build. \(ReleaseChannel.marker)")
     }
+    #endif
 }
 
 #Preview {
