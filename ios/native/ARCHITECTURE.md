@@ -14,6 +14,7 @@ CosmicRituals/
 │   ├── PanchangModels.swift        ZodiacSign, Panchang, NakshatraResult, Muhurta(+Quality), CelestialBody
 │   ├── CosmicEngine.swift          Panchang-focused ephemeris (sidereal, Lahiri ayanamsha)
 │   ├── MuhurtaLibrary.swift        rich per-muhurta detail: deity, resonance, favourable/avoid
+│   ├── PanchangYogaEngine.swift    Vara-Nakshatra combination yogas (Sarvartha/Amrit Siddhi, Guru Pushya, Ravi Yoga)
 │   └── PoojaVidhiCatalog.swift     offline ritual models, search, validation, content policy
 ├── Theme/
 │   └── CosmicTheme.swift           shared cosmic-glass palette + reusable components

@@ -117,6 +117,9 @@ struct Panchang: Codable {
     let tithiName: String
     let nakshatraIndex: Int
     let nakshatraName: String
+    /// The Sun's own sidereal nakshatra, distinct from `nakshatraIndex` (the
+    /// Moon's), needed for Ravi Yoga's Sun-to-Moon nakshatra count.
+    let sunNakshatraIndex: Int
     let yogaIndex: Int
     let yogaName: String
     let karanaIndex: Int

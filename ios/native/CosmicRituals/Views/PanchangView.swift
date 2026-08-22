@@ -321,10 +321,38 @@ struct PanchangView: View {
                 }
                 .padding(.horizontal)
 
+                panchangYogaCard(for: p)
+
                 inauspiciousKalaCard
 
             }
             .padding(.vertical)
+        }
+    }
+
+    @ViewBuilder
+    private func panchangYogaCard(for panchang: Panchang) -> some View {
+        let matches = PanchangYogaEngine.evaluate(panchang: panchang)
+        if !matches.isEmpty {
+            CosmicGlassCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    CosmicSectionHeader(title: "Auspicious Combinations", icon: "sparkles")
+                    ForEach(matches) { match in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(match.name)
+                                .font(.subheadline.bold())
+                                .foregroundStyle(theme.primary)
+                            Text(match.summary)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if match.id != matches.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal)
         }
     }
 

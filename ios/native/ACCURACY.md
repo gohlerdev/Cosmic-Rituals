@@ -36,6 +36,20 @@ the solver, not the absolute accuracy of the compact astronomical model. The UI
 uses a conservative plus-or-minus 12 minute validation envelope for externally
 published civil-time comparisons.
 
+## Vara-Nakshatra combination yogas
+
+`PanchangYogaEngine` cross-references the weekday and the already-computed
+Moon (and, for Ravi Yoga, Sun) nakshatra against classical combination rules.
+Sources were cross-checked across multiple independent, mutually consistent
+references before implementation, not taken from a single site:
+
+| Yoga | Rule | Cited to |
+|---|---|---|
+| Sarvartha Siddhi | Fixed table of 34 (weekday, nakshatra) pairs | Jyotir Nibandha |
+| Amrit Siddhi | One nakshatra per weekday, each also a Sarvartha Siddhi member | Kalamrita, Muhurta Parijata |
+| Guru Pushya | Pushya nakshatra on Thursday | Standard Panchang convention |
+| Ravi Yoga | Sun-nakshatra-to-Moon-nakshatra inclusive count of 4, 6, 9, 10, 13, or 20 in the 27-nakshatra cycle | Standard Panchang convention |
+
 ## Regression evidence
 
 The native test target includes independent fixtures whose expected values are

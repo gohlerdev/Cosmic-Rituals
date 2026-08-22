@@ -262,6 +262,7 @@ enum CosmicEngine {
 
         // Nakshatra of Moon
         let moonNak = getNakshatraPada(moonLon)
+        let sunNakshatraIdx = getNakshatraPada(sunLon).nakshatraIndex
 
         // Yoga: (sun + moon) / (360/27)
         let yogaDeg = normalize360(sunLon + moonLon)
@@ -282,6 +283,7 @@ enum CosmicEngine {
             tithiName: Panchang.tithiNames[tithiIdx.clamped(to: 0...29)],
             nakshatraIndex: moonNak.nakshatraIndex,
             nakshatraName: moonNak.nakshatraName,
+            sunNakshatraIndex: sunNakshatraIdx,
             yogaIndex: yogaIdx,
             yogaName: Panchang.yogaNames[yogaIdx],
             karanaIndex: karanaIdx.clamped(to: 0...10),
