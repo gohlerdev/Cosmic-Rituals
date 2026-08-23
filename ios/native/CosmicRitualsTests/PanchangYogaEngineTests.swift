@@ -46,7 +46,11 @@ final class PanchangYogaEngineTests: XCTestCase {
             ("Friday", 26), ("Friday", 16), ("Friday", 0), ("Friday", 6), ("Friday", 21),
             ("Saturday", 21), ("Saturday", 3), ("Saturday", 14),
         ]
-        XCTAssertEqual(pairs.count, 34, "the published table has 34 pairs; a pair was added or dropped by mistake")
+        XCTAssertEqual(pairs.count, 34, "this test's own list drifted from the 34 published pairs")
+        XCTAssertEqual(
+            pairs.count, PanchangYogaEngine.sarvarthaSiddhiPairCount,
+            "the engine's table gained or lost a pair relative to this test's enumeration of it"
+        )
         for (weekday, nakshatra) in pairs {
             let panchang = makePanchang(weekdayName: weekday, nakshatraIndex: nakshatra)
             let matches = PanchangYogaEngine.evaluate(panchang: panchang)

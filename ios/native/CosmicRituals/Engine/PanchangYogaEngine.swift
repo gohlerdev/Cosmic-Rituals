@@ -88,6 +88,13 @@ enum PanchangYogaEngine {
     static func nakshatraCount(from start: Int, to end: Int) -> Int {
         ((end - start + 27) % 27) + 1
     }
+
+    /// Total (weekday, nakshatra) pairs in the Sarvartha Siddhi table, exposed
+    /// so tests can assert against the actual table rather than against a
+    /// second, independently-maintained count that could silently drift from it.
+    static var sarvarthaSiddhiPairCount: Int {
+        sarvarthaSiddhiNakshatraIndices.values.reduce(0) { $0 + $1.count }
+    }
 }
 
 struct PanchangYogaMatch: Equatable, Sendable, Identifiable {

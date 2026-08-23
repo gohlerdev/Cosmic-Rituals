@@ -334,6 +334,11 @@ struct PanchangView: View {
     private func panchangYogaCard(for panchang: Panchang) -> some View {
         let matches = PanchangYogaEngine.evaluate(panchang: panchang)
         if !matches.isEmpty {
+            // Every one of these yogas depends on the Moon's nakshatra, so
+            // none outlasts the nakshatra itself even when the weekday does.
+            let nakshatraEndsLabel = panchang.transitions.nakshatra.map {
+                " (until \($0.endTime.ritualTransitionLabel(relativeTo: panchang.date, in: calculationContext.timeZone)))"
+            } ?? ""
             CosmicGlassCard {
                 VStack(alignment: .leading, spacing: 10) {
                     CosmicSectionHeader(title: "Auspicious Combinations", icon: "sparkles")
@@ -342,7 +347,7 @@ struct PanchangView: View {
                             Text(match.name)
                                 .font(.subheadline.bold())
                                 .foregroundStyle(theme.primary)
-                            Text(match.summary)
+                            Text(match.summary + nakshatraEndsLabel)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
