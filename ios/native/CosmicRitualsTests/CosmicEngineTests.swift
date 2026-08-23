@@ -159,6 +159,60 @@ final class CosmicEngineTests: XCTestCase {
         )
     }
 
+    func testPublishedFridayChoghadiyaSequenceAndTimes() throws {
+        // Drik Panchang, Mumbai, 2026-07-24 (sunrise 06:12, sunset 19:17):
+        // day Chara/Labha/Amrita/Kala/Shubha/Roga/Udvega/Chara,
+        // night Roga/Kala/Labha/Udvega/Shubha/Amrita/Chara/Roga.
+        let mumbai = context(2026, 7, 24, latitude: 19.0760, longitude: 72.8777, timeZone: "Asia/Kolkata")
+        let periods = CosmicEngine.getChoghadiya(context: mumbai)
+        XCTAssertEqual(periods.count, 16)
+        XCTAssertEqual(periods.map(\.quality.rawValue), [
+            "Char", "Labh", "Amrit", "Kaal", "Shubh", "Rog", "Udveg", "Char",
+            "Rog", "Kaal", "Labh", "Udveg", "Shubh", "Amrit", "Char", "Rog",
+        ])
+
+        try assertLocalInterval((start: periods[0].startTime, end: periods[0].endTime, label: "day 1"),
+                                startHour: 6, startMinute: 12, endHour: 7, endMinute: 51,
+                                context: mumbai, toleranceMinutes: 12)
+        try assertLocalInterval((start: periods[3].startTime, end: periods[3].endTime, label: "day 4"),
+                                startHour: 11, startMinute: 7, endHour: 12, endMinute: 45,
+                                context: mumbai, toleranceMinutes: 12)
+        try assertLocalInterval((start: periods[7].startTime, end: periods[7].endTime, label: "day 8"),
+                                startHour: 17, startMinute: 39, endHour: 19, endMinute: 17,
+                                context: mumbai, toleranceMinutes: 12)
+        try assertLocalInterval((start: periods[8].startTime, end: periods[8].endTime, label: "night 1"),
+                                startHour: 19, startMinute: 17, endHour: 20, endMinute: 39,
+                                context: mumbai, toleranceMinutes: 12)
+        try assertLocalInterval((start: periods[10].startTime, end: periods[10].endTime, label: "night 3"),
+                                startHour: 22, startMinute: 1, endHour: 23, endMinute: 23,
+                                context: mumbai, toleranceMinutes: 12)
+    }
+
+    func testPublishedFridayHoraSequenceAndTimes() throws {
+        // Drik Panchang, Mumbai, 2026-07-24 (sunrise 06:12, sunset 19:17):
+        // Chaldean day sequence starting from Friday's lord (Venus).
+        let mumbai = context(2026, 7, 24, latitude: 19.0760, longitude: 72.8777, timeZone: "Asia/Kolkata")
+        let horas = CosmicEngine.getHora(context: mumbai)
+        XCTAssertEqual(horas.count, 24)
+        XCTAssertEqual(horas.map(\.planet), [
+            .venus, .mercury, .moon, .saturn, .jupiter, .mars, .sun, .venus, .mercury, .moon, .saturn, .jupiter,
+            .mars, .sun, .venus, .mercury, .moon, .saturn, .jupiter, .mars, .sun, .venus, .mercury, .moon,
+        ])
+
+        try assertLocalInterval((start: horas[0].startTime, end: horas[0].endTime, label: "day hora 1"),
+                                startHour: 6, startMinute: 12, endHour: 7, endMinute: 18,
+                                context: mumbai, toleranceMinutes: 12)
+        try assertLocalInterval((start: horas[11].startTime, end: horas[11].endTime, label: "day hora 12"),
+                                startHour: 18, startMinute: 12, endHour: 19, endMinute: 17,
+                                context: mumbai, toleranceMinutes: 12)
+        try assertLocalInterval((start: horas[12].startTime, end: horas[12].endTime, label: "night hora 1"),
+                                startHour: 19, startMinute: 17, endHour: 20, endMinute: 12,
+                                context: mumbai, toleranceMinutes: 12)
+        try assertLocalInterval((start: horas[16].startTime, end: horas[16].endTime, label: "night hora 5"),
+                                startHour: 22, startMinute: 56, endHour: 23, endMinute: 50,
+                                context: mumbai, toleranceMinutes: 12)
+    }
+
     func testAbhijitIsNotPresentedAsAuspiciousOnWednesday() {
         let bartlesville = context(
             2026, 7, 22,

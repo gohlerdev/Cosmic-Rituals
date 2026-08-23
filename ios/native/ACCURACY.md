@@ -62,6 +62,8 @@ recorded beside their sources:
 - Rahu Kala, Yamaganda, Gulika, and Dur Muhurta: published Mumbai Friday
   fixtures, plus Hyderabad Tuesday Dur Muhurta including its night period.
 - Abhijit Muhurta: Mumbai on Friday, plus the Wednesday omission rule.
+- Choghadiya and Hora: published Mumbai Friday sequence and clock times for
+  every quality/planet and both day and night halves.
 - Boundary invariants: multiple seasons and time zones verify that every solved
   transition changes from its declared current value to its declared next value.
 - Civil-time invariants: selected-day preservation east and west of UTC, DST day
