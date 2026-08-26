@@ -188,9 +188,18 @@ enum CosmicEngine {
         let lp = LpDegrees * DEG
         sumL += 3_958 * sin(a1) + 1_962 * sin(lp - F) + 318 * sin(a2)
 
-        // Mean geocentric ecliptic longitude, referred to the mean equinox of date.
+        // Mean geocentric ecliptic longitude, then the same leading-term
+        // nutation the Sun's apparent longitude already carries
+        // (delta-psi ~ -17.20" sin(omega), i.e. -0.00478 deg): both limbs'
+        // inputs are now apparent-of-date in the SAME frame. Before this, the
+        // Sun was apparent and the Moon mean, so the nakshatra silently
+        // lagged nutation (<= 17") while tithi/yoga mixed frames. Nutation
+        // cancels in the Sun-Moon elongation, so tithi keeps only the Sun's
+        // physically-correct aberration. Verified against Meeus example
+        // 47.a's PUBLISHED apparent longitude in the fixture test.
         let lon = LpDegrees + sumL / 1_000_000.0
-        return normalize360(lon)
+        let omega = normalize360(125.04 - 1934.136 * T) * DEG
+        return normalize360(lon - 0.00478 * sin(omega))
     }
 
     // MARK: - Nakshatra

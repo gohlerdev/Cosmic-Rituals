@@ -251,10 +251,14 @@ final class CosmicEngineTests: XCTestCase {
     }
 
     func testMeeusChapter47MoonLongitudeFixture() {
-        // Meeus example 47.a, 1992-04-12 0h TD: mean geocentric
-        // ecliptic longitude 133.162655°. The apparent value includes nutation
-        // and is intentionally not mixed into this Table 47.A implementation.
-        XCTAssertEqual(CosmicEngine.moonLongitude(jd: 2_448_724.5), 133.162655, accuracy: 0.000_02)
+        // Meeus example 47.a, 1992-04-12 0h TD. The book publishes BOTH the
+        // mean longitude (133.162655°) and, after adding nutation, the
+        // apparent longitude 133.167265°. The engine now returns apparent of
+        // date (mean + leading-term nutation, the same -0.00478° sin Ω the
+        // Sun's apparent longitude carries), so the fixture pins the book's
+        // apparent value. Tolerance 0.0005° (~1.8″) covers the difference
+        // between full nutation (16.595″ here) and the single leading term.
+        XCTAssertEqual(CosmicEngine.moonLongitude(jd: 2_448_724.5), 133.167265, accuracy: 0.000_5)
     }
 
     func testNakshatraAndPadaBoundariesDoNotDrift() {
