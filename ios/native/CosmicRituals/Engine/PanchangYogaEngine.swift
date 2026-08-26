@@ -102,3 +102,39 @@ struct PanchangYogaMatch: Equatable, Sendable, Identifiable {
     let name: String
     let summary: String
 }
+
+// MARK: - Weekday advisories
+
+/// Disha Shula: the direction classically avoided for beginning a journey on
+/// each weekday. A fixed lookup with no astronomy. Table cross-checked across
+/// multiple independent, mutually consistent published sources (mpanchang,
+/// anytimeastro, drikpanchang's daily value) before implementation:
+/// Sunday/Friday west, Monday/Saturday east, Tuesday/Wednesday north,
+/// Thursday south.
+enum DishaShula {
+    static let directionByWeekday: [String: String] = [
+        "Sunday": "West",
+        "Monday": "East",
+        "Tuesday": "North",
+        "Wednesday": "North",
+        "Thursday": "South",
+        "Friday": "West",
+        "Saturday": "East",
+    ]
+
+    static func direction(forWeekdayName weekdayName: String) -> String? {
+        directionByWeekday[weekdayName]
+    }
+}
+
+/// Bhadra (Vishti karana) — the one karana classically treated as a standing
+/// caution for new undertakings. No new astronomy: the karana index and its
+/// solved end time already exist on the Panchang; this only names the state.
+enum BhadraAdvisory {
+    /// Panchang.karanaNames index of Vishti.
+    static let vishtiKaranaIndex = 6
+
+    static func isActive(karanaIndex: Int) -> Bool {
+        karanaIndex == vishtiKaranaIndex
+    }
+}

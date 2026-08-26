@@ -743,9 +743,27 @@ struct PanchangView: View {
         let yamaganda = bundle.yamaganda
         let gulikaKala = bundle.gulikaKala
 
+        let panchang = bundle.panchang
+        let dishaShula = DishaShula.direction(forWeekdayName: panchang.weekdayName)
+        let bhadraActive = BhadraAdvisory.isActive(karanaIndex: panchang.karanaIndex)
+
         return CosmicGlassCard {
             VStack(alignment: .leading, spacing: 10) {
                 CosmicSectionHeader(title: "Inauspicious Periods", icon: "exclamationmark.triangle")
+                if bhadraActive {
+                    HStack(spacing: 6) {
+                        CosmicIcon(name: "hand.raised.fill", size: 13, color: .red)
+                        Text("Bhadra (Vishti karana) is running" +
+                             (panchang.transitions.karana.map { " until \($0.endTime.ritualTransitionLabel(relativeTo: panchang.date, in: calculationContext.timeZone))" } ?? ""))
+                            .font(.caption.bold())
+                            .foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Text("Vishti is the one karana classically treated as a standing caution for new undertakings.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Divider()
+                }
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Rahu Kala").font(.caption2).foregroundStyle(.tertiary)
@@ -767,6 +785,16 @@ struct PanchangView: View {
                     Text(kalaTimeString(gulikaKala))
                         .font(.subheadline.bold()).foregroundStyle(.purple)
                     Text("Son of Saturn — highly inauspicious").font(.caption2).foregroundStyle(.secondary)
+                }
+                if let dishaShula {
+                    Divider()
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Disha Shula").font(.caption2).foregroundStyle(.tertiary)
+                        Text("Avoid starting travel toward the \(dishaShula)")
+                            .font(.subheadline.bold()).foregroundStyle(.teal)
+                        Text("Traditional weekday travel-direction caution; not a prohibition.")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
                 }
                 if !durMuhurtas.isEmpty {
                     Divider()

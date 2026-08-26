@@ -143,6 +143,35 @@ final class PanchangYogaEngineTests: XCTestCase {
         XCTAssertFalse(matches.contains { $0.id == "raviYoga" })
     }
 
+    // MARK: - Disha Shula
+
+    /// The published weekday table, verified across multiple mutually
+    /// consistent sources: Sunday/Friday West, Monday/Saturday East,
+    /// Tuesday/Wednesday North, Thursday South.
+    func testDishaShulaMatchesThePublishedWeekdayTable() {
+        let expected: [String: String] = [
+            "Sunday": "West", "Monday": "East", "Tuesday": "North",
+            "Wednesday": "North", "Thursday": "South", "Friday": "West",
+            "Saturday": "East",
+        ]
+        XCTAssertEqual(DishaShula.directionByWeekday, expected)
+        for (weekday, direction) in expected {
+            XCTAssertEqual(DishaShula.direction(forWeekdayName: weekday), direction)
+        }
+        XCTAssertNil(DishaShula.direction(forWeekdayName: "Someday"))
+    }
+
+    // MARK: - Bhadra
+
+    /// Vishti sits at index 6 of Panchang.karanaNames; every other karana
+    /// index must stay quiet.
+    func testBhadraFiresOnlyForVishti() {
+        XCTAssertEqual(Panchang.karanaNames[BhadraAdvisory.vishtiKaranaIndex], "Vishti")
+        for index in Panchang.karanaNames.indices {
+            XCTAssertEqual(BhadraAdvisory.isActive(karanaIndex: index), index == 6)
+        }
+    }
+
     // MARK: - No false positives
 
     func testAChartWithNoneOfTheseCombinationsReportsNoYogas() {
