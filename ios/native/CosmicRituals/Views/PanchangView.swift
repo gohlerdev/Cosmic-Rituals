@@ -2,12 +2,8 @@ import SwiftUI
 
 struct PanchangView: View {
     @State private var selectedDate = Date()
-    @State private var panchangSnapshot: (context: CalculationContext, value: Panchang)?
-    @State private var muhurtas: [Muhurta] = []
+    @State private var dayBundle: DailyPanchangBundle?
     @State private var detailMuhurta: Muhurta?
-    @State private var sunriseSunset: (Date, Date)?
-    @State private var choghadiya: [Choghadiya] = []
-    @State private var hora: [Hora] = []
     @State private var showThemePicker = false
     @State private var showLocationPicker = false
     @State private var selectedActivity: String = "Business"
@@ -182,13 +178,66 @@ struct PanchangView: View {
         locationManager.calculationContext(for: selectedDate)
     }
 
-    private var resolvedPanchang: Panchang {
-        let context = calculationContext
-        if let snapshot = panchangSnapshot, snapshot.context == context {
-            return snapshot.value
+    /// Every value derived from the selected day and location, computed once
+    /// and tagged with the context that produced it. The previous shape tagged
+    /// only the Panchang snapshot: muhurtas, solar times, Choghadiya, and Hora
+    /// were bare state, so a location change could render one frame of the new
+    /// context's Panchang against the old location's timings. It also left
+    /// nine engine calls (including the full lunar series) running inside the
+    /// render path on every minute tick.
+    private struct DailyPanchangBundle {
+        let context: CalculationContext
+        let panchang: Panchang
+        let muhurtas: [Muhurta]
+        let sunriseSunset: (Date, Date)?
+        let choghadiya: [Choghadiya]
+        let hora: [Hora]
+        let brahmaMuhurta: (start: Date, end: Date)?
+        let abhijitMuhurta: (start: Date, end: Date)?
+        let moonNakshatra: NakshatraResult
+        let sunNakshatra: NakshatraResult
+        let durMuhurtas: [(start: Date, end: Date, label: String)]
+        let rahuKala: (start: Date, end: Date)?
+        let yamaganda: (start: Date, end: Date)?
+        let gulikaKala: (start: Date, end: Date)?
+
+        static func compute(for context: CalculationContext) -> DailyPanchangBundle {
+            DailyPanchangBundle(
+                context: context,
+                panchang: CosmicEngine.getPanchang(context: context),
+                muhurtas: CosmicEngine.getMuhurtas(context: context),
+                sunriseSunset: CosmicEngine.getSunriseSunset(context: context),
+                choghadiya: CosmicEngine.getChoghadiya(context: context),
+                hora: CosmicEngine.getHora(context: context),
+                brahmaMuhurta: CosmicEngine.getBrahmaMuhurta(context: context),
+                abhijitMuhurta: CosmicEngine.getAbhijitMuhurta(context: context),
+                moonNakshatra: CosmicEngine.getMoonNakshatraPada(context: context),
+                sunNakshatra: CosmicEngine.getSunNakshatra(context: context),
+                durMuhurtas: CosmicEngine.getDurMuhurta(context: context),
+                rahuKala: CosmicEngine.getRahuKala(context: context),
+                yamaganda: CosmicEngine.getYamaganda(context: context),
+                gulikaKala: CosmicEngine.getGulikaKala(context: context)
+            )
         }
-        return CosmicEngine.getPanchang(context: context)
     }
+
+    /// Self-heals exactly like the old resolvedPanchang: if the cached bundle
+    /// was built for a different context (location or date changed but
+    /// recompute has not run yet), compute fresh rather than render stale
+    /// values for one frame.
+    private var resolvedBundle: DailyPanchangBundle {
+        let context = calculationContext
+        if let dayBundle, dayBundle.context == context {
+            return dayBundle
+        }
+        return .compute(for: context)
+    }
+
+    private var resolvedPanchang: Panchang { resolvedBundle.panchang }
+    private var muhurtas: [Muhurta] { resolvedBundle.muhurtas }
+    private var sunriseSunset: (Date, Date)? { resolvedBundle.sunriseSunset }
+    private var choghadiya: [Choghadiya] { resolvedBundle.choghadiya }
+    private var hora: [Hora] { resolvedBundle.hora }
 
     private var poojaDayContext: RitualDayContext {
         let panchang = resolvedPanchang
@@ -238,7 +287,7 @@ struct PanchangView: View {
                                 solarTimeCell(icon: "sunset.fill", color: .red, label: "Sunset", time: set)
                             }
                             Divider()
-                            if let brahma = CosmicEngine.getBrahmaMuhurta(context: calculationContext) {
+                            if let brahma = resolvedBundle.brahmaMuhurta {
                                 HStack(spacing: 6) {
                                     CosmicIcon(name: "moon.zzz.fill", size: 13, color: .purple)
                                     Text("Brahma Muhurta")
@@ -248,7 +297,7 @@ struct PanchangView: View {
                                         .font(.caption.bold()).foregroundStyle(.purple)
                                 }
                             }
-                            if let abhijit = CosmicEngine.getAbhijitMuhurta(context: calculationContext) {
+                            if let abhijit = resolvedBundle.abhijitMuhurta {
                                 HStack(spacing: 6) {
                                     CosmicIcon(name: "sun.max.circle.fill", size: 13, color: .yellow)
                                     Text("Abhijit Muhurta")
@@ -276,7 +325,7 @@ struct PanchangView: View {
                 CosmicGlassCard(cornerRadius: 16) {
                     VStack(alignment: .leading, spacing: 12) {
                         CosmicSectionHeader(title: "Nakshatra Detail", icon: "star.fill")
-                        let nak = CosmicEngine.getMoonNakshatraPada(context: calculationContext)
+                        let nak = resolvedBundle.moonNakshatra
 
                         HStack(alignment: .top, spacing: 16) {
                             Text(nak.symbol).font(.system(size: 52))
@@ -522,8 +571,8 @@ struct PanchangView: View {
 
     private var panchangSummary: String {
         let p = resolvedPanchang
-        let nak = CosmicEngine.getMoonNakshatraPada(context: calculationContext)
-        let sunNak = CosmicEngine.getSunNakshatra(context: calculationContext)
+        let nak = resolvedBundle.moonNakshatra
+        let sunNak = resolvedBundle.sunNakshatra
         let sunSignIdx = Int(sunNak.degree / 30.0) % 12
         let df = selectedDate.ritualCompleteDate(in: calculationContext.timeZone)
 
@@ -688,10 +737,11 @@ struct PanchangView: View {
     }
 
     private var inauspiciousKalaCard: some View {
-        let durMuhurtas = CosmicEngine.getDurMuhurta(context: calculationContext)
-        let rahuKala = CosmicEngine.getRahuKala(context: calculationContext)
-        let yamaganda = CosmicEngine.getYamaganda(context: calculationContext)
-        let gulikaKala = CosmicEngine.getGulikaKala(context: calculationContext)
+        let bundle = resolvedBundle
+        let durMuhurtas = bundle.durMuhurtas
+        let rahuKala = bundle.rahuKala
+        let yamaganda = bundle.yamaganda
+        let gulikaKala = bundle.gulikaKala
 
         return CosmicGlassCard {
             VStack(alignment: .leading, spacing: 10) {
@@ -862,12 +912,7 @@ struct PanchangView: View {
     // MARK: - Helpers
 
     private func recompute() {
-        let context = calculationContext
-        panchangSnapshot = (context, CosmicEngine.getPanchang(context: context))
-        muhurtas = CosmicEngine.getMuhurtas(context: context)
-        sunriseSunset = CosmicEngine.getSunriseSunset(context: context)
-        choghadiya = CosmicEngine.getChoghadiya(context: context)
-        hora = CosmicEngine.getHora(context: context)
+        dayBundle = .compute(for: calculationContext)
     }
 
     private func solarTimeCell(icon: String, color: Color, label: String, time: Date) -> some View {
