@@ -16,6 +16,8 @@ struct PanchangView: View {
     @AppStorage("ritualSelectedDestination") private var selectedTab = 0
     @AppStorage("cosmicThemeVariant") private var variantRaw = CosmicThemeVariant.cosmicDark.rawValue
     @AppStorage("ritualExperienceMode") private var experienceRaw = RitualExperienceMode.ritualNow.rawValue
+    @AppStorage("ritualBirthNakshatraIndex") private var birthNakshatraIndex = -1
+    @AppStorage("ritualBirthPada") private var birthPada = 1
     @Environment(\.cosmicTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -112,7 +114,7 @@ struct PanchangView: View {
                 .background(.ultraThinMaterial)
             }
             .sheet(isPresented: $showThemePicker) {
-                ThemePickerSheet(variantRaw: $variantRaw, experienceRaw: $experienceRaw)
+                ThemePickerSheet(variantRaw: $variantRaw, experienceRaw: $experienceRaw, birthNakshatraIndex: $birthNakshatraIndex, birthPada: $birthPada)
             }
             .sheet(isPresented: $showLocationPicker) {
                 RitualLocationPicker(manager: locationManager)
@@ -372,10 +374,72 @@ struct PanchangView: View {
 
                 panchangYogaCard(for: p)
 
+                personalStarsCard(for: p)
+
                 inauspiciousKalaCard
 
             }
             .padding(.vertical)
+        }
+    }
+
+    /// Tarabala / Chandrabala / Chandrashtama for the configured birth star.
+    /// Hidden until the user sets a birth nakshatra in Settings.
+    @ViewBuilder
+    private func personalStarsCard(for panchang: Panchang) -> some View {
+        if (0..<27).contains(birthNakshatraIndex) {
+            let tara = PersonalStarEngine.tarabala(
+                birthNakshatraIndex: birthNakshatraIndex,
+                dayNakshatraIndex: panchang.nakshatraIndex
+            )
+            let janmaRashi = PersonalStarEngine.janmaRashiIndex(
+                birthNakshatraIndex: birthNakshatraIndex, pada: birthPada
+            )
+            let chandrashtama = PersonalStarEngine.isChandrashtama(
+                janmaRashiIndex: janmaRashi, dayMoonSignIndex: panchang.moonSignIndex
+            )
+            let chandrabala = PersonalStarEngine.hasChandrabala(
+                janmaRashiIndex: janmaRashi, dayMoonSignIndex: panchang.moonSignIndex
+            )
+            CosmicGlassCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    CosmicSectionHeader(title: "Personal Stars", icon: "person.crop.circle.badge.moon")
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Tarabala · \(tara.name) (\(tara.taraNumber) of 9)")
+                                .font(.subheadline.bold())
+                                .foregroundStyle(tara.quality == .favorable ? .green : tara.quality == .unfavorable ? .orange : .yellow)
+                            Text(tara.note)
+                                .font(.caption2).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer()
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("panchang.personal.tarabala")
+                    Divider()
+                    HStack(spacing: 6) {
+                        CosmicIcon(name: chandrabala ? "moon.stars.fill" : "moon", size: 13, color: chandrabala ? .green : .secondary)
+                        Text(chandrabala
+                             ? "Chandrabala present — the Moon sits in a supportive sign from your janma rashi."
+                             : "Chandrabala absent today.")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if chandrashtama {
+                        HStack(spacing: 6) {
+                            CosmicIcon(name: "exclamationmark.triangle.fill", size: 13, color: .red)
+                            Text("Chandrashtama: the Moon transits the 8th sign from your janma rashi — traditionally a day for lighter commitments.")
+                                .font(.caption.bold()).foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    Text("Computed from your saved birth nakshatra (\(Panchang.nakshatraNames[birthNakshatraIndex]), pada \(birthPada)). Traditional day-quality context, not a prediction or an obligation.")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.horizontal)
         }
     }
 
@@ -810,6 +874,8 @@ struct PanchangView: View {
 private struct ThemePickerSheet: View {
     @Binding var variantRaw: String
     @Binding var experienceRaw: String
+    @Binding var birthNakshatraIndex: Int
+    @Binding var birthPada: Int
     @Environment(\.dismiss) private var dismiss
     @Environment(\.cosmicTheme) private var theme
 
@@ -828,6 +894,38 @@ private struct ThemePickerSheet: View {
                             .padding(.horizontal)
                         RitualExperiencePicker(selectionRaw: $experienceRaw)
                             .padding(.horizontal)
+
+                        Divider().overlay(theme.semanticDivider).padding(.horizontal)
+
+                        // Birth star: unlocks the Personal Stars card
+                        // (Tarabala, Chandrabala, Chandrashtama). Optional,
+                        // stored on device only.
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Birth Nakshatra (optional)")
+                                .font(.caption.bold()).foregroundStyle(theme.semanticSecondaryText)
+                            Text("From your birth chart. Enables the personal Tarabala, Chandrabala, and Chandrashtama reading for each day. Stored only on this device.")
+                                .font(.caption).foregroundStyle(theme.semanticSecondaryText)
+                            Picker("Birth nakshatra", selection: $birthNakshatraIndex) {
+                                Text("Not set").tag(-1)
+                                ForEach(0..<27, id: \.self) { index in
+                                    Text(Panchang.nakshatraNames[index]).tag(index)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .accessibilityIdentifier("settings.birthNakshatra")
+                            if birthNakshatraIndex >= 0 {
+                                Picker("Pada", selection: $birthPada) {
+                                    ForEach(1...4, id: \.self) { pada in
+                                        Text("Pada \(pada)").tag(pada)
+                                    }
+                                }
+                                .pickerStyle(.segmented)
+                                .accessibilityIdentifier("settings.birthPada")
+                                Text("The pada decides your janma rashi when a nakshatra spans two signs, which Chandrabala and Chandrashtama depend on.")
+                                    .font(.caption2).foregroundStyle(theme.semanticSecondaryText)
+                            }
+                        }
+                        .padding(.horizontal)
 
                         Divider().overlay(theme.semanticDivider).padding(.horizontal)
 
