@@ -562,18 +562,52 @@ enum CosmicEngine {
     }
 
     /// Returns sunrise and sunset as `Date` values for a given day and location.
+    ///
+    /// The solver works in UTC calendar days, but the caller asks about a LOCAL
+    /// civil day. Where the zone offset and the longitude's solar time disagree
+    /// by more than ~12 hours — Apia and Nuku'alofa at UTC+13 with longitudes
+    /// near -172/-175 are selectable examples — the events solved for the
+    /// matching UTC day land on the wrong local day, silently shifting sunrise,
+    /// every muhurta, and the sunrise-anchored five limbs by a full day. So the
+    /// result is checked against the requested local day and re-solved with the
+    /// UTC day shifted when it disagrees, instead of trusting the naive mapping.
     static func getSunriseSunset(context: CalculationContext) -> (sunrise: Date, sunset: Date)? {
         let components = context.localDayComponents
-        guard let y = components.year, let m = components.month, let d = components.day,
-              let ss = sunriseSunsetUTHours(
-                year: y,
-                month: m,
-                day: d,
-                latDeg: context.latitude,
-                lonDeg: context.longitude
-              ) else { return nil }
-        return (dateFromUTCHour(ss.rise, year: y, month: m, day: d),
-                dateFromUTCHour(ss.set, year: y, month: m, day: d))
+        guard let y = components.year, let m = components.month, let d = components.day else {
+            return nil
+        }
+
+        func solve(utcDayOffset: Int) -> (sunrise: Date, sunset: Date)? {
+            var cal = Calendar(identifier: .gregorian)
+            cal.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+            guard let base = cal.date(from: DateComponents(year: y, month: m, day: d, hour: 12)),
+                  let shifted = cal.date(byAdding: .day, value: utcDayOffset, to: base) else {
+                return nil
+            }
+            let sc = cal.dateComponents([.year, .month, .day], from: shifted)
+            guard let sy = sc.year, let sm = sc.month, let sd = sc.day,
+                  let ss = sunriseSunsetUTHours(
+                    year: sy, month: sm, day: sd,
+                    latDeg: context.latitude, lonDeg: context.longitude
+                  ) else { return nil }
+            return (dateFromUTCHour(ss.rise, year: sy, month: sm, day: sd),
+                    dateFromUTCHour(ss.set, year: sy, month: sm, day: sd))
+        }
+
+        guard let naive = solve(utcDayOffset: 0) else { return nil }
+        let calendar = context.calendar
+        let requestedDay = calendar.startOfDay(for: context.localNoon)
+        let solvedDay = calendar.startOfDay(for: naive.sunrise)
+        let dayError = calendar.dateComponents([.day], from: requestedDay, to: solvedDay).day ?? 0
+        guard dayError != 0 else { return naive }
+
+        guard let corrected = solve(utcDayOffset: -dayError),
+              calendar.isDate(corrected.sunrise, inSameDayAs: context.localNoon) else {
+            // A correction that still misses would mean inconsistent inputs;
+            // fail closed rather than return events for the wrong civil day.
+            return nil
+        }
+        return corrected
     }
 
     static func getSunriseSunset(date: Date, latDeg: Double, lonDeg: Double) -> (sunrise: Date, sunset: Date)? {

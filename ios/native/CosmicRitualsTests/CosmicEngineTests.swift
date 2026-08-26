@@ -41,6 +41,15 @@ final class CosmicEngineTests: XCTestCase {
         SolarFixture(name: "New York DST", latitude: 40.7128, longitude: -74.0060,
                      timeZone: "America/New_York", year: 2026, month: 3, day: 8,
                      expectedSunriseMinute: 438, expectedSunsetMinute: 1_135, toleranceMinutes: 12),
+        // gaisma.com Apia, 21 July: 06:51 / 18:16. Apia sits at UTC+13 with a
+        // longitude near -172, so its zone offset and solar time disagree by
+        // more than a whole day-half; solving its events on the matching UTC
+        // calendar day used to land every result on the WRONG local day. This
+        // fixture exercises that date-line path, and the same-local-day
+        // assertion below is the invariant that was silently violated.
+        SolarFixture(name: "Apia date-line", latitude: -13.8506, longitude: -171.7513,
+                     timeZone: "Pacific/Apia", year: 2026, month: 7, day: 21,
+                     expectedSunriseMinute: 411, expectedSunsetMinute: 1_096, toleranceMinutes: 12),
     ]
 
     func testPublishedSolarFixturesStayOnSelectedLocalDay() throws {
