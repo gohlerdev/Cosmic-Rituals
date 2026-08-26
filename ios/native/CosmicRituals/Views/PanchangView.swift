@@ -400,6 +400,8 @@ struct PanchangView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("panchang.yoga.\(match.id)")
                         if match.id != matches.last?.id {
                             Divider()
                         }
@@ -410,61 +412,8 @@ struct PanchangView: View {
         }
     }
 
-    // MARK: - Upcoming Festivals
 
-    private var upcomingFestivalsCard: some View {
-        CosmicGlassCard {
-            VStack(alignment: .leading, spacing: 10) {
-                CosmicSectionHeader(title: "Upcoming Festivals", icon: "sparkle")
-                let occurrences = FestivalEngine.upcomingFestivals(from: selectedDate, count: 6)
-                if occurrences.isEmpty {
-                    Text("No festivals found in the next 365 days.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                } else {
-                    ForEach(occurrences) { occ in
-                        HStack(alignment: .top, spacing: 12) {
-                            VStack(spacing: 2) {
-                                Text(occ.date.ritualDate(template: "d", in: calculationContext.timeZone))
-                                    .font(.title3.bold())
-                                Text(occ.date.ritualDate(template: "MMM", in: calculationContext.timeZone))
-                                    .font(.system(size: 10)).foregroundStyle(.secondary)
-                            }
-                            .frame(width: 36)
-                            .padding(.vertical, 4)
-                            .background(categoryColor(occ.festival.category).opacity(0.15),
-                                        in: RoundedRectangle(cornerRadius: 6))
 
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(occ.festival.name)
-                                    .font(.subheadline.bold())
-                                    .lineLimit(2)
-                                Text(occ.festival.category.rawValue)
-                                    .font(.system(size: 9, weight: .semibold))
-                                    .foregroundStyle(categoryColor(occ.festival.category))
-                                    .padding(.horizontal, 6).padding(.vertical, 2)
-                                    .background(categoryColor(occ.festival.category).opacity(0.15), in: Capsule())
-                            }
-                            Spacer()
-                        }
-                        if occ.id != occurrences.last?.id {
-                            Divider()
-                        }
-                    }
-                }
-            }
-        }
-        .padding(.horizontal)
-    }
-
-    private func categoryColor(_ cat: FestivalCategory) -> Color {
-        switch cat {
-        case .major:     return theme.primary
-        case .vrat:      return .orange
-        case .regional:  return .purple
-        case .solar:     return .yellow
-        case .ancestral: return .gray
-        }
-    }
 
     // MARK: - 30 Muhurtas
 
@@ -818,125 +767,6 @@ struct PanchangView: View {
         .padding(.horizontal)
     }
 
-    // MARK: - Vedic Calendar Card
-
-    @ViewBuilder
-    private func vedicCalendarCard(_ vi: VedicCalendarInfo) -> some View {
-        CosmicGlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                CosmicSectionHeader(title: "Vedic Calendar", icon: "calendar.badge.clock")
-
-                // Samvat row
-                HStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Vikram Samvat").font(.caption2).foregroundStyle(.tertiary)
-                        Text("\(vi.vikramSamvat)").font(.subheadline.bold())
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Divider().frame(height: 36)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Shaka Samvat").font(.caption2).foregroundStyle(.tertiary)
-                        Text("\(vi.shakaSamvat)").font(.subheadline.bold())
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 12)
-                }
-
-                Divider()
-
-                // Masa row
-                HStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Amanta Masa").font(.caption2).foregroundStyle(.tertiary)
-                        Text(vi.amantaMasa).font(.subheadline.bold())
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Divider().frame(height: 36)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Purnimanta Masa").font(.caption2).foregroundStyle(.tertiary)
-                        Text(vi.purnimantaMasa).font(.subheadline.bold())
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 12)
-                }
-
-                Divider()
-
-                // Ritu + Ayana row
-                HStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Vedic Ritu (Sidereal)").font(.caption2).foregroundStyle(.tertiary)
-                        Text(vi.vedaRitu).font(.subheadline.bold())
-                        Text(vi.drikRitu + " (Drik)").font(.system(size: 10)).foregroundStyle(.tertiary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Divider().frame(height: 36)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Ayana").font(.caption2).foregroundStyle(.tertiary)
-                        Text(vi.ayana)
-                            .font(.subheadline.bold())
-                            .foregroundStyle(vi.ayana == "Uttarayan" ? .yellow : .cyan)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 12)
-                }
-
-                Divider()
-
-                // Anandadi Yoga
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(vi.anandadiIsAuspicious ? Color.green : Color.red)
-                        .frame(width: 8, height: 8)
-                    VStack(alignment: .leading, spacing: 1) {
-                        HStack(spacing: 6) {
-                            Text("Anandadi Yoga:").font(.caption2).foregroundStyle(.tertiary)
-                            Text(vi.anandadiYoga)
-                                .font(.caption.bold())
-                                .foregroundStyle(vi.anandadiIsAuspicious ? .green : .red)
-                        }
-                        Text(vi.anandadiMeaning).font(.caption2).foregroundStyle(.secondary)
-                    }
-                }
-
-                // Amrit Kaal
-                if let start = vi.amritKaalStart, let end = vi.amritKaalEnd {
-                    Divider()
-                    HStack(spacing: 8) {
-                        CosmicIcon(name: "drop.fill", size: 13, color: .cyan)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("Amrit Kaal").font(.caption2).foregroundStyle(.tertiary)
-                            Text("\(shortTime(start)) – \(shortTime(end))")
-                                .font(.subheadline.bold()).foregroundStyle(.cyan)
-                            Text("Nectar time — excellent for all activities").font(.caption2).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-                // Chandrashtama (only if birth nakshatra is set)
-                if !vi.chandrashtamaNakshatra.isEmpty {
-                    Divider()
-                    HStack(spacing: 8) {
-                        CosmicIcon(name: vi.isCurrentlyChandrashtama ? "exclamationmark.triangle.fill" : "moon.haze.fill",
-                                   size: 13, color: vi.isCurrentlyChandrashtama ? .orange : .secondary)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("Chandrashtama (8th nakshatra)").font(.caption2).foregroundStyle(.tertiary)
-                            Text(vi.chandrashtamaNakshatra)
-                                .font(.caption.bold())
-                                .foregroundStyle(vi.isCurrentlyChandrashtama ? .orange : .primary)
-                            Text(vi.isCurrentlyChandrashtama
-                                 ? "Active today — avoid major decisions"
-                                 : "Not active today")
-                                .font(.caption2)
-                                .foregroundStyle(vi.isCurrentlyChandrashtama ? .orange : .secondary)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(.horizontal)
-    }
-
     // MARK: - Helpers
 
     private func recompute() {
@@ -1176,22 +1006,6 @@ private struct ThemePickerSheet: View {
 
 // MARK: - Supporting Views
 
-struct PanchangLimbRow: View {
-    let icon: String
-    let color: Color
-    let label: String
-    let value: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            CosmicIcon(name: icon, size: 20, color: color)
-                .frame(width: 22)
-            Text(label).font(.subheadline).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).font(.subheadline.bold())
-        }
-    }
-}
 
 struct MuhurtaRow: View {
     let muhurta: Muhurta

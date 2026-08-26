@@ -549,15 +549,6 @@ enum CosmicEngine {
         return results
     }
 
-    static func getMuhurtas(date: Date, latDeg: Double, lonDeg: Double) -> [Muhurta] {
-        getMuhurtas(context: CalculationContext(
-            localDay: date,
-            latitude: latDeg,
-            longitude: lonDeg,
-            timeZoneIdentifier: TimeZone.autoupdatingCurrent.identifier
-        ))
-    }
-
     // MARK: - Public Convenience
 
     /// Returns the Moon's sidereal nakshatra and pada for a given date.
@@ -617,15 +608,6 @@ enum CosmicEngine {
             return nil
         }
         return corrected
-    }
-
-    static func getSunriseSunset(date: Date, latDeg: Double, lonDeg: Double) -> (sunrise: Date, sunset: Date)? {
-        getSunriseSunset(context: CalculationContext(
-            localDay: date,
-            latitude: latDeg,
-            longitude: lonDeg,
-            timeZoneIdentifier: TimeZone.autoupdatingCurrent.identifier
-        ))
     }
 
     // MARK: - Sunrise-based daily observances
@@ -745,15 +727,6 @@ enum CosmicEngine {
         return out
     }
 
-    static func getHora(date: Date, latDeg: Double, lonDeg: Double) -> [Hora] {
-        getHora(context: CalculationContext(
-            localDay: date,
-            latitude: latDeg,
-            longitude: lonDeg,
-            timeZoneIdentifier: TimeZone.autoupdatingCurrent.identifier
-        ))
-    }
-
     // MARK: - Moonrise / Moonset prototype (not surfaced)
 
     /// Experimental approximation retained for research only. It is not
@@ -805,38 +778,6 @@ enum CosmicEngine {
         nextTransition(for: .tithi, after: panchangReferenceDate(for: context))?.endTime
     }
 
-    // MARK: - Chandra Bala & Tara Bala
-
-    struct TaraBalaResult {
-        let position: Int           // 1–27 from birth nakshatra
-        let taraNumber: Int         // 1–9
-        let taraName: String
-        let taraQuality: String     // "Auspicious" / "Inauspicious" / "Variable"
-        let chandraBalaStrong: Bool  // strong Chandra Bala?
-        let chandraBalaScore: String // "Strong" / "Weak"
-    }
-
-    static func getTaraBala(currentNakshatraIdx: Int, birthNakshatraIdx: Int) -> TaraBalaResult {
-        let pos = ((currentNakshatraIdx - birthNakshatraIdx + 27) % 27) + 1
-
-        // Chandra Bala: strong at positions 1, 3, 6, 7, 10, 11 (from birth nakshatra)
-        let strongPositions: Set<Int> = [1, 3, 6, 7, 10, 11]
-        let isStrong = strongPositions.contains(pos)
-
-        // Tara: group positions into 9 taras of 3 nakshatras each
-        let taraNum = ((pos - 1) % 9) + 1
-        let taraNames = ["Janma", "Sampat", "Vipat", "Kshema", "Pratyak", "Sadhana", "Nidhan", "Mitra", "Parama Mitra"]
-        let taraQualities = ["Variable", "Auspicious", "Inauspicious", "Auspicious", "Inauspicious",
-                             "Auspicious", "Inauspicious", "Auspicious", "Most Auspicious"]
-        return TaraBalaResult(
-            position: pos,
-            taraNumber: taraNum,
-            taraName: taraNames[taraNum - 1],
-            taraQuality: taraQualities[taraNum - 1],
-            chandraBalaStrong: isStrong,
-            chandraBalaScore: isStrong ? "Strong" : "Weak"
-        )
-    }
 
     // MARK: - Sunrise-based inauspicious kalas
 
@@ -917,15 +858,6 @@ enum CosmicEngine {
                 label: periods.count == 1 ? "Dur Muhurta" : (index == 0 ? "1st" : "2nd")
             )
         }
-    }
-
-    static func getDurMuhurta(date: Date, latDeg: Double, lonDeg: Double) -> [(start: Date, end: Date, label: String)] {
-        getDurMuhurta(context: CalculationContext(
-            localDay: date,
-            latitude: latDeg,
-            longitude: lonDeg,
-            timeZoneIdentifier: TimeZone.autoupdatingCurrent.identifier
-        ))
     }
 
     // MARK: - Vedic Calendar Extended Info prototype (not surfaced)
