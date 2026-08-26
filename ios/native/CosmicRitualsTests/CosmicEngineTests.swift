@@ -248,6 +248,40 @@ final class CosmicEngineTests: XCTestCase {
         // Swiss Ephemeris: 2020-01-01 12:00 TT = 24°08′11.3962″.
         let expected = 24.0 + 8.0 / 60.0 + 11.3962 / 3_600.0
         XCTAssertEqual(CosmicEngine.lahiriAyanamsha(year: 2020), expected, accuracy: 0.0001)
+
+        // Second anchor, 120 years earlier, so the polynomial's RANGE is
+        // fenced rather than one epoch: the canonical Lahiri value at J1900
+        // is 22°27′37.69″ (Indian Ephemeris and Nautical Almanac 1965, the
+        // constant Swiss Ephemeris itself carries). 0.001° tolerance covers
+        // the compact polynomial's ~1.3″ deviation at this distance.
+        let j1900 = 22.0 + 27.0 / 60.0 + 37.69 / 3_600.0
+        XCTAssertEqual(CosmicEngine.lahiriAyanamsha(year: 1900), j1900, accuracy: 0.001)
+    }
+
+    /// Reykjavik (64.1°N) at the June solstice: the day is selected-civil-day
+    /// anchored, but the SUN genuinely sets after local midnight. Published
+    /// times (gaisma.com, June solstice, UTC+0 year-round): sunrise 02:55,
+    /// sunset 00:04 on the NEXT calendar day. The engine must keep sunrise on
+    /// the selected day, let sunset land on the next civil day rather than
+    /// clamping or failing, and still divide the 30 muhurtas.
+    func testReykjavikSolsticeSunsetCrossesLocalMidnight() throws {
+        let reykjavik = context(2026, 6, 21, latitude: 64.1466, longitude: -21.9426, timeZone: "Atlantic/Reykjavik")
+        let solar = try XCTUnwrap(CosmicEngine.getSunriseSunset(context: reykjavik))
+        let calendar = reykjavik.calendar
+
+        XCTAssertTrue(calendar.isDate(solar.sunrise, inSameDayAs: reykjavik.localNoon))
+        XCTAssertGreaterThan(solar.sunset, solar.sunrise)
+
+        let rise = calendar.dateComponents([.hour, .minute], from: solar.sunrise)
+        let riseMinute = (rise.hour ?? 0) * 60 + (rise.minute ?? 0)
+        XCTAssertLessThanOrEqual(abs(riseMinute - (2 * 60 + 55)), 12, "published sunrise 02:55")
+
+        let set = calendar.dateComponents([.day, .hour, .minute], from: solar.sunset)
+        XCTAssertEqual(set.day, 22, "the sun sets after midnight, on the next civil day")
+        let setMinute = (set.hour ?? 0) * 60 + (set.minute ?? 0)
+        XCTAssertLessThanOrEqual(abs(setMinute - 4), 12, "published sunset 00:04 next day")
+
+        XCTAssertEqual(CosmicEngine.getMuhurtas(context: reykjavik).count, 30)
     }
 
     func testMeeusChapter47MoonLongitudeFixture() {
