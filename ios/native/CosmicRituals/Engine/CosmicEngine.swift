@@ -202,6 +202,129 @@ enum CosmicEngine {
         return normalize360(lon - 0.00478 * sin(omega))
     }
 
+    /// Meeus Table 47.B latitude terms (D, M, M', F, coefficient in 1e-6 deg),
+    /// transcribed from two independent open-source transcription lineages
+    /// (soniakeys/meeus and PyMeeus) that agree on all 60 rows, and verified
+    /// end-to-end against the book's Example 47.a before landing.
+    private static let latitudeTerms: [(d: Int, m: Int, moonAnomaly: Int, f: Int, coefficient: Double)] = [
+        (0, 0, 0, 1, 5128122),
+        (0, 0, 1, 1, 280602),
+        (0, 0, 1, -1, 277693),
+        (2, 0, 0, -1, 173237),
+        (2, 0, -1, 1, 55413),
+        (2, 0, -1, -1, 46271),
+        (2, 0, 0, 1, 32573),
+        (0, 0, 2, 1, 17198),
+        (2, 0, 1, -1, 9266),
+        (0, 0, 2, -1, 8822),
+        (2, -1, 0, -1, 8216),
+        (2, 0, -2, -1, 4324),
+        (2, 0, 1, 1, 4200),
+        (2, 1, 0, -1, -3359),
+        (2, -1, -1, 1, 2463),
+        (2, -1, 0, 1, 2211),
+        (2, -1, -1, -1, 2065),
+        (0, 1, -1, -1, -1870),
+        (4, 0, -1, -1, 1828),
+        (0, 1, 0, 1, -1794),
+        (0, 0, 0, 3, -1749),
+        (0, 1, -1, 1, -1565),
+        (1, 0, 0, 1, -1491),
+        (0, 1, 1, 1, -1475),
+        (0, 1, 1, -1, -1410),
+        (0, 1, 0, -1, -1344),
+        (1, 0, 0, -1, -1335),
+        (0, 0, 3, 1, 1107),
+        (4, 0, 0, -1, 1021),
+        (4, 0, -1, 1, 833),
+        (0, 0, 1, -3, 777),
+        (4, 0, -2, 1, 671),
+        (2, 0, 0, -3, 607),
+        (2, 0, 2, -1, 596),
+        (2, -1, 1, -1, 491),
+        (2, 0, -2, 1, -451),
+        (0, 0, 3, -1, 439),
+        (2, 0, 2, 1, 422),
+        (2, 0, -3, -1, 421),
+        (2, 1, -1, 1, -366),
+        (2, 1, 0, 1, -351),
+        (4, 0, 0, 1, 331),
+        (2, -1, 1, 1, 315),
+        (2, -2, 0, -1, 302),
+        (0, 0, 1, 3, -283),
+        (2, 1, 1, -1, -229),
+        (1, 1, 0, -1, 223),
+        (1, 1, 0, 1, 223),
+        (0, 1, -2, -1, -220),
+        (2, 1, -1, -1, -220),
+        (1, 0, 1, 1, -185),
+        (2, -1, -2, -1, 181),
+        (0, 1, 2, 1, -177),
+        (4, 0, -2, -1, 176),
+        (4, -1, -1, -1, 166),
+        (1, 0, 1, -1, -164),
+        (4, 0, 1, -1, 132),
+        (1, 0, -1, -1, -119),
+        (4, -1, 0, -1, 115),
+        (2, -2, 0, 1, 107),
+    ]
+
+    /// The Moon's geocentric ecliptic LATITUDE (Meeus Table 47.B plus the six
+    /// additive terms), degrees. Verified against the book's Example 47.a
+    /// (JD 2448724.5 TD: beta = -3.229126) in the fixture test. Latitude is
+    /// unaffected by nutation in longitude, so no apparent correction
+    /// applies here.
+    static func moonLatitude(jd: Double) -> Double {
+        let T = (jd - J2000) / 36525.0
+        let t2 = T * T
+        let t3 = t2 * T
+        let t4 = t3 * T
+        let LpDegrees = normalize360(
+            218.3164477 + 481267.88123421 * T - 0.0015786 * t2
+                + t3 / 538841.0 - t4 / 65194000.0
+        )
+        let D = normalize360(
+            297.8501921 + 445267.1114034 * T - 0.0018819 * t2
+                + t3 / 545868.0 - t4 / 113065000.0
+        ) * DEG
+        let M = normalize360(
+            357.5291092 + 35999.0502909 * T - 0.0001536 * t2
+                + t3 / 24490000.0
+        ) * DEG
+        let Mp = normalize360(
+            134.9633964 + 477198.8675055 * T + 0.0087414 * t2
+                + t3 / 69699.0 - t4 / 14712000.0
+        ) * DEG
+        let F = normalize360(
+            93.2720950 + 483202.0175233 * T - 0.0036539 * t2
+                - t3 / 3526000.0 + t4 / 863310000.0
+        ) * DEG
+        let e = 1 - 0.002516 * T - 0.0000074 * t2
+
+        var sumB: Double = 0
+        for term in latitudeTerms {
+            let argument = Double(term.d) * D
+                + Double(term.m) * M
+                + Double(term.moonAnomaly) * Mp
+                + Double(term.f) * F
+            let eccentricityScale = pow(e, Double(abs(term.m)))
+            sumB += term.coefficient * eccentricityScale * sin(argument)
+        }
+
+        // Additive terms (Meeus p. 342). No E scaling on these.
+        let a1 = normalize360(119.75 + 131.849 * T) * DEG
+        let a3 = normalize360(313.45 + 481266.484 * T) * DEG
+        let lp = LpDegrees * DEG
+        sumB += -2_235 * sin(lp)
+            + 382 * sin(a3)
+            + 175 * sin(a1 - F)
+            + 175 * sin(a1 + F)
+            + 127 * sin(lp - Mp)
+            - 115 * sin(lp + Mp)
+
+        return sumB / 1_000_000.0
+    }
+
     // MARK: - Nakshatra
 
     static func getNakshatraPada(_ siderealDeg: Double) -> NakshatraResult {
