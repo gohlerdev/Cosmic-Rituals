@@ -222,3 +222,39 @@ extension Muhurta {
     /// The rich classical detail for this muhurta, if available.
     var info: MuhurtaInfo? { MuhurtaLibrary.info(for: id) }
 }
+
+
+/// Selects the "Best Time Today" for an activity. Engine-side so a fixed
+/// `now` can pin the behavior: the previous view-layer sort preferred any
+/// CURRENT match over quality and never excluded windows that had already
+/// ENDED, so at 21:00 a long-finished morning muhurta -- or a currently
+/// running mixed one -- could be recommended as best.
+enum MuhurtaRecommendation {
+    /// The best not-yet-ended match: only excellent or auspicious windows
+    /// qualify as a recommendation (a mixed or inauspicious window is never
+    /// "best" for an activity, even when it is the one running now);
+    /// quality ranks first, a currently running window breaks ties, then
+    /// the earlier start.
+    static func best(matchingKeywords keywords: [String], in muhurtas: [Muhurta], now: Date) -> Muhurta? {
+        let lowered = keywords.map { $0.lowercased() }
+        return muhurtas
+            .filter { muhurta in
+                guard muhurta.endTime > now else { return false }
+                guard muhurta.quality == .excellent || muhurta.quality == .auspicious else { return false }
+                guard let info = MuhurtaLibrary.info(for: muhurta.id) else { return false }
+                let favorable = info.favorable.joined(separator: " ").lowercased()
+                return lowered.contains { favorable.contains($0) }
+            }
+            .sorted { a, b in
+                let order: [MuhurtaQuality] = [.excellent, .auspicious]
+                let qa = order.firstIndex(of: a.quality) ?? 2
+                let qb = order.firstIndex(of: b.quality) ?? 2
+                if qa != qb { return qa < qb }
+                let aCurrent = a.startTime <= now && now < a.endTime
+                let bCurrent = b.startTime <= now && now < b.endTime
+                if aCurrent != bCurrent { return aCurrent }
+                return a.startTime < b.startTime
+            }
+            .first
+    }
+}

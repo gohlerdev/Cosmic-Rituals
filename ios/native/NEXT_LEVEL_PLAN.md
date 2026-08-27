@@ -98,8 +98,10 @@ The existing native app already contains:
 - Notifications are visibly off and not production-ready.
 - Widget source is a prototype; there is no shipping WidgetKit extension contract.
 - Live Activities, Dynamic Island behavior, and Apple Watch are pending.
-- Moonrise/moonset, festivals/vratas, extended lunisolar calendar data, and nine
-  Graha positions are quarantined prototypes, not trusted product capabilities.
+- Moonrise/moonset SHIPPED via an independently verified path (Meeus ch. 15
+  solver + Table 47.B latitude, USNO fixtures) and is no longer quarantined.
+  Festivals/vratas, extended lunisolar calendar data, and nine Graha positions
+  remain quarantined prototypes, not trusted product capabilities.
 - Varjyam and Amrit Kalam are pending.
 - Regional festival precedence, Amanta/Purnimanta choice, Adhika/Kshaya month
   handling, and event-specific vyapti rules are not release-ready.

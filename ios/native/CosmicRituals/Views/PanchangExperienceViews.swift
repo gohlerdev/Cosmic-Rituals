@@ -450,7 +450,7 @@ private struct VedicLedgerExperience: View {
                         Circle()
                             .fill(theme.primary.opacity(0.09))
                             .frame(width: 70, height: 70)
-                        Image(systemName: "moonphase.waning.crescent")
+                        Image(systemName: TithiMoonPhase.symbolName(tithiIndex: panchang.tithiIndex))
                             .font(.system(size: 38, weight: .light))
                             .foregroundStyle(theme.primary)
                     }

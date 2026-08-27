@@ -9,9 +9,11 @@ final class CelestialRiseSetTests: XCTestCase {
 
     /// Meeus Example 47.a (2nd ed., p. 342): 1992 April 12, 0h TD
     /// (JD 2448724.5) gives the Moon's ecliptic latitude -3.229126 degrees.
+    /// The book quotes a DYNAMICAL time instant, so this pins the TT entry
+    /// point directly; the UT-facing overload adds Delta T first.
     /// The same epoch's longitude fixture lives beside the sun tests.
     func testMeeusExample47aMoonLatitude() {
-        XCTAssertEqual(CosmicEngine.moonLatitude(jd: 2_448_724.5), -3.229126, accuracy: 0.000_002)
+        XCTAssertEqual(CosmicEngine.moonLatitude(jdTT: 2_448_724.5), -3.229126, accuracy: 0.000_002)
     }
 
     /// The generic solver, fed the Sun, must reproduce the production

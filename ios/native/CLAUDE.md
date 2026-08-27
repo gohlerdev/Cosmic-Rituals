@@ -33,7 +33,7 @@ Use `xcrun simctl list devices available` to get a UUID. `-destination
 'platform=iOS Simulator,name=iPhone 17,OS=latest'` also works for local iteration.
 
 ```bash
-# Run a single test (55 XCTest cases total, all in CosmicEngineTests)
+# Run a single test (the suite spans CosmicEngineTests plus sibling files -- PersonalStar, PanchangYoga, CelestialRiseSet, Performance, ReleaseBoundary and more; ~125 cases and growing)
 xcodebuild -project CosmicRituals.xcodeproj -scheme CosmicRituals \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
   CODE_SIGNING_ALLOWED=NO \
@@ -165,7 +165,7 @@ Per `NEXT_LEVEL_PLAN.md`, distribution actions are separate from engineering and
 requires explicit authorization at the time it occurs: TestFlight upload, App Store
 Connect mutation, external tester distribution, review submission, pricing changes,
 subscription activation, and public release. Do not perform any of them on your own
-initiative. Build 7 (`TestFlight` config) is internal-testing-only.
+initiative. Any build made with the `TestFlight` configuration is internal-testing-only, whatever its build number.
 
 Use the plan's status vocabulary precisely when reporting: *planned, implemented, built,
 tested, user-confirmed, uploaded, testing, release candidate, release-approved, live*.

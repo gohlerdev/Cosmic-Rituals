@@ -35,11 +35,76 @@ enum CosmicEngine {
     }
 
     static func julianDateFromDate(_ date: Date) -> Double {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
-        let comps = cal.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
-        let hour = Double(comps.hour ?? 12) + Double(comps.minute ?? 0) / 60.0 + Double(comps.second ?? 0) / 3600.0
-        return julianDate(year: comps.year ?? 2000, month: comps.month ?? 1, day: comps.day ?? 1, decimalHour: hour)
+        // JD of the Unix epoch plus elapsed days -- exact for the Gregorian
+        // calendar and sub-second, where the previous component-based form
+        // truncated to whole seconds (making the solver's "sub-second
+        // convergence" claim quietly false at the input boundary).
+        2_440_587.5 + date.timeIntervalSince1970 / 86_400.0
+    }
+
+    // MARK: - Delta T (TT - UT, Espenak-Meeus piecewise polynomials)
+
+    /// The Meeus series are defined in Terrestrial (dynamical) Time; civil
+    /// timestamps are UT. Evaluating the series directly at a UT Julian date
+    /// lagged the Moon ~38 arcseconds (about +70-75 s on every tithi,
+    /// nakshatra, yoga, and karana end time in 2026, growing each year).
+    /// Espenak-Meeus piecewise polynomials, same model the sibling Cosmic
+    /// Astrology engine carries; the 2005-2050 branch is that model's own
+    /// projection and reads a few seconds above measured IERS Delta T, which
+    /// is far inside the published +-12 minute envelope and disclosed in
+    /// ACCURACY.md.
+    static func deltaTSeconds(year: Double) -> Double {
+        switch year {
+        case ..<948:
+            let u = (year - 2000) / 100
+            return 2177 + 497 * u + 44.1 * u * u
+        case 948..<1600:
+            let u = (year - 1000) / 100
+            return 102 + 102 * u + 25.3 * u * u
+        case 1600..<1700:
+            let t = year - 1600
+            return 120 - 0.9808 * t - 0.01532 * t * t + t * t * t / 7129.0
+        case 1700..<1800:
+            let t = year - 1700
+            return 8.83 + 0.1603 * t - 0.0059285 * t * t + 0.00013336 * t * t * t - t * t * t * t / 1_174_000
+        case 1800..<1860:
+            let t = year - 1800
+            return 13.72 - 0.332447 * t + 0.0068612 * t * t + 0.0041116 * t * t * t
+                - 0.00037436 * pow(t, 4) + 0.0000121272 * pow(t, 5)
+                - 0.0000001699 * pow(t, 6) + 0.000000000875 * pow(t, 7)
+        case 1860..<1900:
+            let t = year - 1860
+            return 7.62 + 0.5737 * t - 0.251754 * t * t + 0.01680668 * t * t * t
+                - 0.0004473624 * pow(t, 4) + pow(t, 5) / 233_174
+        case 1900..<1920:
+            let t = year - 1900
+            return -2.79 + 1.494119 * t - 0.0598939 * t * t + 0.0061966 * t * t * t - 0.000197 * pow(t, 4)
+        case 1920..<1941:
+            let t = year - 1920
+            return 21.20 + 0.84493 * t - 0.076100 * t * t + 0.0020936 * t * t * t
+        case 1941..<1961:
+            let t = year - 1950
+            return 29.07 + 0.407 * t - t * t / 233 + t * t * t / 2547
+        case 1961..<1986:
+            let t = year - 1975
+            return 45.45 + 1.067 * t - t * t / 260 - t * t * t / 718
+        case 1986..<2005:
+            let t = year - 2000
+            return 63.86 + 0.3345 * t - 0.060374 * t * t + 0.0017275 * t * t * t
+                + 0.000651814 * pow(t, 4) + 0.00002373599 * pow(t, 5)
+        case 2005..<2050:
+            let t = year - 2000
+            return 62.92 + 0.32217 * t + 0.005589 * t * t
+        default:
+            let u = (year - 1820) / 100
+            return -20 + 32 * u * u
+        }
+    }
+
+    /// UT Julian date -> Terrestrial Time Julian date.
+    static func terrestrialJD(fromUT jd: Double) -> Double {
+        let year = 2000.0 + (jd - J2000) / 365.25
+        return jd + deltaTSeconds(year: year) / 86_400.0
     }
 
     // MARK: - Lahiri Ayanamsha (Chitra Paksha)
@@ -58,7 +123,17 @@ enum CosmicEngine {
         normalize360(280.46646 + 36000.76983 * T + 0.0003032 * T * T)
     }
 
+    /// Apparent solar longitude for a UT Julian date -- converts to TT
+    /// internally, where the Meeus series is defined.
     static func sunLongitude(jd: Double) -> Double {
+        sunLongitude(jdTT: terrestrialJD(fromUT: jd))
+    }
+
+    /// The series itself, taking a TT (dynamical time) Julian date. Meeus's
+    /// worked examples quote TD instants, so the book fixtures pin this
+    /// entry point directly.
+    static func sunLongitude(jdTT: Double) -> Double {
+        let jd = jdTT
         let T = (jd - J2000) / 36525.0
         let L0 = sunMeanLongitudeDegrees(T: T)
         let M  = normalize360(357.52911 + 35999.05029 * T - 0.0001537 * T * T) * DEG
@@ -78,7 +153,15 @@ enum CosmicEngine {
 
     // MARK: - Moon (Meeus §47, complete Table 47.A longitude series)
 
+    /// Apparent lunar longitude for a UT Julian date -- converts to TT
+    /// internally, where the Meeus series is defined.
     static func moonLongitude(jd: Double) -> Double {
+        moonLongitude(jdTT: terrestrialJD(fromUT: jd))
+    }
+
+    /// The series itself, taking a TT Julian date (Meeus worked examples).
+    static func moonLongitude(jdTT: Double) -> Double {
+        let jd = jdTT
         let T = (jd - J2000) / 36525.0
         let t2 = T * T
         let t3 = t2 * T
@@ -274,7 +357,15 @@ enum CosmicEngine {
     /// (JD 2448724.5 TD: beta = -3.229126) in the fixture test. Latitude is
     /// unaffected by nutation in longitude, so no apparent correction
     /// applies here.
+    /// Ecliptic lunar latitude for a UT Julian date -- converts to TT
+    /// internally, where the Meeus series is defined.
     static func moonLatitude(jd: Double) -> Double {
+        moonLatitude(jdTT: terrestrialJD(fromUT: jd))
+    }
+
+    /// The series itself, taking a TT Julian date (Meeus worked examples).
+    static func moonLatitude(jdTT: Double) -> Double {
+        let jd = jdTT
         let T = (jd - J2000) / 36525.0
         let t2 = T * T
         let t3 = t2 * T
@@ -654,13 +745,27 @@ enum CosmicEngine {
         let dayDuration   = sunset.timeIntervalSince(sunrise)   / 15.0
         let nightDuration = nextSunrise.timeIntervalSince(sunset) / 15.0
 
+        // Muhurta 8 IS the Abhijit window (same eighth-of-fifteen span), and
+        // the engine already declines to present Abhijit as auspicious on
+        // Wednesday (getAbhijitMuhurta). Showing the identical window as
+        // Excellent in the muhurta list on the same screen contradicted
+        // that rule, so the same weekday convention demotes it here too.
+        let isWednesday = context.localDayComponents.weekday == 4
+
         var results: [Muhurta] = []
         for i in 0..<15 {
             let start = sunrise.addingTimeInterval(Double(i) * dayDuration)
             let end   = start.addingTimeInterval(dayDuration)
             let data  = muhurtaData[i]
-            results.append(Muhurta(id: i + 1, name: data.name, quality: data.quality,
-                                   purpose: data.purpose, startTime: start, endTime: end, isDay: true))
+            let demoted = isWednesday && i == 7
+            results.append(Muhurta(
+                id: i + 1, name: data.name,
+                quality: demoted ? .mixed : data.quality,
+                purpose: demoted
+                    ? data.purpose + " — this is the Abhijit window, which classical daily practice does not observe as auspicious on Wednesday"
+                    : data.purpose,
+                startTime: start, endTime: end, isDay: true
+            ))
         }
         for i in 0..<15 {
             let start = sunset.addingTimeInterval(Double(i) * nightDuration)
@@ -802,6 +907,12 @@ enum CosmicEngine {
         return out
     }
 
+    /// QUARANTINED-ONLY legacy overload: silently binds the DEVICE time zone
+    /// to explicit coordinates, violating the calculation contract every
+    /// shipping path follows. Its sole caller is the quarantined
+    /// getVedicCalendarInfo prototype; marked unavailable to shipping code so
+    /// a new call site cannot compile against it by accident.
+    @available(*, deprecated, message: "Device-timezone overload; use getChoghadiya(context:) with an explicit IANA zone")
     static func getChoghadiya(date: Date, latDeg: Double, lonDeg: Double) -> [Choghadiya] {
         getChoghadiya(context: CalculationContext(
             localDay: date,

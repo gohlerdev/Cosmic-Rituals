@@ -100,14 +100,19 @@ enum PanchangPDFExporter {
 
             y += 12
 
-            // Section: validated solar values only. Moonrise is intentionally hidden
-            // until a real lunar altitude-crossing solver is available.
-            y = drawSection(title: "✦ Solar Times", at: y, width: pageRect.width,
+            // Section: celestial times. Moonrise/moonset ship via the
+            // verified Meeus ch. 15 solver (USNO fixtures) and export the
+            // same values the screen shows -- the earlier "hidden until a
+            // real solver exists" boundary is closed.
+            y = drawSection(title: "✦ Celestial Times", at: y, width: pageRect.width,
                             headerFont: headerFont, color: gold, bgColor: gold.withAlphaComponent(0.08))
 
+            let moonEvents = CelestialRiseSet.moonRiseSet(context: context)
             let times: [(String, String)] = [
                 ("Sunrise", ss.map { shortTime($0.sunrise, timeZone: context.timeZone) } ?? "Unavailable"),
                 ("Sunset",  ss.map { shortTime($0.sunset, timeZone: context.timeZone) } ?? "Unavailable"),
+                ("Moonrise", moonEvents.moonrise.map { shortTime($0, timeZone: context.timeZone) } ?? "None this day"),
+                ("Moonset", moonEvents.moonset.map { shortTime($0, timeZone: context.timeZone) } ?? "None this day"),
                 ("Surya Rashi", ZodiacSign.fromIndex(sunSignIdx).name),
                 ("Surya Nakshatra", sunNak.nakshatraName),
                 ("Chandra Rashi", p.moonSignName),
@@ -119,6 +124,27 @@ enum PanchangPDFExporter {
             }
 
             y += 12
+
+            // Section: inauspicious kalas, matching the screen's card so the
+            // exported day is not a silently reduced subset of it.
+            let kalaRows: [(String, (start: Date, end: Date)?)] = [
+                ("Rahu Kala", CosmicEngine.getRahuKala(context: context)),
+                ("Yamaganda", CosmicEngine.getYamaganda(context: context)),
+                ("Gulika Kala", CosmicEngine.getGulikaKala(context: context)),
+            ]
+            if kalaRows.contains(where: { $0.1 != nil }) {
+                y = drawSection(title: "✦ Inauspicious Kalas", at: y, width: pageRect.width,
+                                headerFont: headerFont, color: gold, bgColor: gold.withAlphaComponent(0.08))
+                for (label, window) in kalaRows {
+                    let value = window.map {
+                        "\(shortTime($0.start, timeZone: context.timeZone))–\(shortTime($0.end, timeZone: context.timeZone))"
+                    } ?? "No sunrise arc"
+                    draw(label, at: CGPoint(x: 48, y: y), font: labelFont, color: subtle)
+                    draw(value, at: CGPoint(x: 200, y: y), font: bodyFont, color: .white)
+                    y += 22
+                }
+                y += 12
+            }
 
             // Section: Muhurtas
             y = drawSection(title: "✦ Today's Muhurtas (top 10)", at: y, width: pageRect.width,

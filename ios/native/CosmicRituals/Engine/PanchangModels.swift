@@ -220,6 +220,29 @@ enum MuhurtaQuality: String {
     }
 }
 
+enum TithiMoonPhase {
+    /// SF Symbol name for a tithi index 0...29. The lunar phase is a direct
+    /// function of the tithi (each tithi is 12 degrees of elongation), so the
+    /// glyph must track it: Amavasya (29) is the new moon, Purnima (14) the
+    /// full moon, with the six intermediate symbols at their eighths. A
+    /// hard-coded waning crescent previously rendered for every tithi.
+    static func symbolName(tithiIndex: Int) -> String {
+        let symbols = [
+            "moonphase.new.moon",
+            "moonphase.waxing.crescent",
+            "moonphase.first.quarter",
+            "moonphase.waxing.gibbous",
+            "moonphase.full.moon",
+            "moonphase.waning.gibbous",
+            "moonphase.last.quarter",
+            "moonphase.waning.crescent",
+        ]
+        let index = ((tithiIndex % 30) + 30) % 30
+        let eighth = Int(((Double(index) + 0.5) / 30.0 * 8.0).rounded()) % 8
+        return symbols[eighth]
+    }
+}
+
 struct Muhurta: Identifiable {
     let id: Int
     let name: String

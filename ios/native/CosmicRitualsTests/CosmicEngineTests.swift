@@ -284,6 +284,36 @@ final class CosmicEngineTests: XCTestCase {
         XCTAssertEqual(CosmicEngine.getMuhurtas(context: reykjavik).count, 30)
     }
 
+    /// Delta T model pins. Espenak-Meeus published values: the 1986-2005
+    /// polynomial's own constant gives Delta T(2000.0) = 63.86 s (measured
+    /// IERS value 63.83 s), and the 2005-2050 projection gives 64.69 s at
+    /// 2005.0 (measured 64.69 s). The projection runs a few seconds above
+    /// measured Delta T by the 2020s; that bias is the model's, is far
+    /// inside the +-12 minute envelope, and is disclosed in ACCURACY.md.
+    func testDeltaTModelPins() {
+        XCTAssertEqual(CosmicEngine.deltaTSeconds(year: 2000.0), 63.86, accuracy: 0.01)
+        XCTAssertEqual(CosmicEngine.deltaTSeconds(year: 2005.0), 64.69, accuracy: 0.05)
+        // Monotonic through the app's operating decades.
+        XCTAssertGreaterThan(CosmicEngine.deltaTSeconds(year: 2030),
+                             CosmicEngine.deltaTSeconds(year: 2000))
+    }
+
+    /// The UT-facing series must differ from the TT series by exactly the
+    /// Moon's motion over Delta T (~38 arcsec in 2026) -- guarding that the
+    /// conversion is applied once, in the right direction, and not lost.
+    func testUTSeriesLagsTTByDeltaT() {
+        let jdUT = CosmicEngine.julianDate(year: 2026, month: 7, day: 24, decimalHour: 0)
+        let ut = CosmicEngine.moonLongitude(jd: jdUT)
+        let tt = CosmicEngine.moonLongitude(jdTT: jdUT)
+        var delta = ut - tt
+        if delta > 180 { delta -= 360 }
+        if delta < -180 { delta += 360 }
+        // ~13.18 deg/day * deltaT(2026)/86400 days, positive (TT is ahead of UT).
+        let expected = 13.18 / 86_400 * CosmicEngine.deltaTSeconds(year: 2026.5)
+        XCTAssertEqual(delta, expected, accuracy: expected * 0.15)
+        XCTAssertGreaterThan(delta, 0.008)
+    }
+
     func testMeeusChapter47MoonLongitudeFixture() {
         // Meeus example 47.a, 1992-04-12 0h TD. The book publishes BOTH the
         // mean longitude (133.162655°) and, after adding nutation, the
@@ -292,7 +322,7 @@ final class CosmicEngineTests: XCTestCase {
         // Sun's apparent longitude carries), so the fixture pins the book's
         // apparent value. Tolerance 0.0005° (~1.8″) covers the difference
         // between full nutation (16.595″ here) and the single leading term.
-        XCTAssertEqual(CosmicEngine.moonLongitude(jd: 2_448_724.5), 133.167265, accuracy: 0.000_5)
+        XCTAssertEqual(CosmicEngine.moonLongitude(jdTT: 2_448_724.5), 133.167265, accuracy: 0.000_5)
     }
 
     func testNakshatraAndPadaBoundariesDoNotDrift() {

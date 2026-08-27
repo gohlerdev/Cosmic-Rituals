@@ -316,36 +316,40 @@ struct PanchangView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
-                            Divider()
-                            let moonEvents = resolvedBundle.moonRiseSet
-                            HStack(spacing: 6) {
-                                CosmicIcon(name: "moon.haze.fill", size: 13, color: .cyan)
-                                Text("Moonrise").font(.caption).foregroundStyle(.secondary)
-                                Spacer()
-                                Text(moonEvents.moonrise.map { shortTime($0) } ?? "None this day")
-                                    .font(.caption.bold()).foregroundStyle(.cyan)
-                            }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityIdentifier("panchang.moonrise")
-                            HStack(spacing: 6) {
-                                CosmicIcon(name: "moon.fill", size: 13, color: .indigo)
-                                Text("Moonset").font(.caption).foregroundStyle(.secondary)
-                                Spacer()
-                                Text(moonEvents.moonset.map { shortTime($0) } ?? "None this day")
-                                    .font(.caption.bold()).foregroundStyle(.indigo)
-                            }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityIdentifier("panchang.moonset")
-                            if moonEvents.moonrise == nil || moonEvents.moonset == nil {
-                                Text("About once a lunar month the rise or set slips past midnight and a civil day genuinely has none.")
-                                    .font(.caption2).foregroundStyle(.tertiary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
                         } else {
                             Label("Sunrise-based schedules are unavailable for this latitude and date.",
                                   systemImage: "sun.horizon.fill")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                        }
+                        // Moonrise/moonset are NOT sunrise-based: during polar
+                        // day or night the Moon still genuinely rises and sets
+                        // on many dates, so these rows render regardless of
+                        // whether the Sun does.
+                        Divider()
+                        let moonEvents = resolvedBundle.moonRiseSet
+                        HStack(spacing: 6) {
+                            CosmicIcon(name: "moon.haze.fill", size: 13, color: .cyan)
+                            Text("Moonrise").font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            Text(moonEvents.moonrise.map { shortTime($0) } ?? "None this day")
+                                .font(.caption.bold()).foregroundStyle(.cyan)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("panchang.moonrise")
+                        HStack(spacing: 6) {
+                            CosmicIcon(name: "moon.fill", size: 13, color: .indigo)
+                            Text("Moonset").font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            Text(moonEvents.moonset.map { shortTime($0) } ?? "None this day")
+                                .font(.caption.bold()).foregroundStyle(.indigo)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("panchang.moonset")
+                        if moonEvents.moonrise == nil || moonEvents.moonset == nil {
+                            Text("About once a lunar month the rise or set slips past midnight and a civil day genuinely has none.")
+                                .font(.caption2).foregroundStyle(.tertiary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
@@ -695,24 +699,14 @@ struct PanchangView: View {
                 }
 
                 let keywords = activityKeywords[selectedActivity] ?? []
-                let matches = muhurtas
-                    .filter { m in
-                        guard let info = MuhurtaLibrary.info(for: m.id) else { return false }
-                        let fav = info.favorable.joined(separator: " ").lowercased()
-                        return keywords.contains { fav.contains($0) }
-                    }
-                    .sorted {
-                        // Prefer current, then upcoming, then by quality
-                        if $0.isCurrent { return true }
-                        if $1.isCurrent { return false }
-                        let qOrder: [MuhurtaQuality] = [.excellent, .auspicious, .mixed, .inauspicious]
-                        let q0 = qOrder.firstIndex(of: $0.quality) ?? 3
-                        let q1 = qOrder.firstIndex(of: $1.quality) ?? 3
-                        if q0 != q1 { return q0 < q1 }
-                        return $0.startTime < $1.startTime
-                    }
+                // Engine-side selection with an explicit clock: never a
+                // window that already ended, never a mixed or inauspicious
+                // window, quality before currency.
+                let best = MuhurtaRecommendation.best(
+                    matchingKeywords: keywords, in: muhurtas, now: Date()
+                )
 
-                if let best = matches.first {
+                if let best {
                     Button {
                         detailMuhurta = best
                     } label: {
@@ -755,7 +749,7 @@ struct PanchangView: View {
                     )
                     .accessibilityHint("Opens muhurta details")
                 } else {
-                    Text("No matching muhurta found for \(selectedActivity) today.")
+                    Text("No excellent or auspicious muhurta for \(selectedActivity) remains today.")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
             }
@@ -811,6 +805,8 @@ struct PanchangView: View {
                             .font(.subheadline.bold()).foregroundStyle(.red)
                         Text("Avoid new beginnings").font(.caption2).foregroundStyle(.secondary)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("panchang.rahukala")
                     Divider()
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Yamaganda").font(.caption2).foregroundStyle(.tertiary)
@@ -818,6 +814,8 @@ struct PanchangView: View {
                             .font(.subheadline.bold()).foregroundStyle(.orange)
                         Text("Inauspicious period").font(.caption2).foregroundStyle(.secondary)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("panchang.yamaganda")
                 }
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
@@ -826,6 +824,8 @@ struct PanchangView: View {
                         .font(.subheadline.bold()).foregroundStyle(.purple)
                     Text("Son of Saturn — highly inauspicious").font(.caption2).foregroundStyle(.secondary)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("panchang.gulikakala")
                 if let dishaShula {
                     Divider()
                     VStack(alignment: .leading, spacing: 4) {
@@ -835,6 +835,8 @@ struct PanchangView: View {
                         Text("Traditional weekday travel-direction caution; not a prohibition.")
                             .font(.caption2).foregroundStyle(.secondary)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("panchang.dishashula")
                 }
                 if !durMuhurtas.isEmpty {
                     Divider()
@@ -852,6 +854,8 @@ struct PanchangView: View {
                         }
                         Text("Classical inauspicious window").font(.caption2).foregroundStyle(.secondary)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("panchang.durmuhurta")
                 }
             }
         }

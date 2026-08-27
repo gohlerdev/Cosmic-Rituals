@@ -19,7 +19,8 @@ location-aware calculations and explicit limits over unexplained precision.
 
 | Quantity | Current method | Presentation contract |
 |---|---|---|
-| Julian date | Gregorian UTC conversion based on Meeus chapter 7 | Absolute instant |
+| Julian date | Epoch-based UT Julian date (sub-second; the earlier component conversion truncated to whole seconds) | Absolute instant |
+| Time scale (Delta T) | Espenak-Meeus piecewise polynomials convert UT to Terrestrial Time before every Sun/Moon series evaluation; without this every limb end time lagged ~70-75 s in 2026. The 2005-2050 branch is that model's projection and reads a few seconds above measured IERS Delta T -- far inside the published +-12 minute envelope. | Applied internally; Meeus book fixtures pin the TT entry points directly |
 | Sun longitude | Meeus chapter 25 apparent ecliptic longitude | Offline compact ephemeris |
 | Moon longitude | Complete Meeus table 47.A longitude series plus the leading nutation term, giving apparent-of-date in the same frame as the Sun | Offline compact ephemeris |
 | Sidereal conversion | Lahiri (Chitra Paksha) ayanamsha polynomial | Named in Settings and exports |
