@@ -128,10 +128,6 @@ final class ReleaseBoundaryTests: XCTestCase {
     /// not the testing one. Asserting both directions is what makes the marker meaningful:
     /// checking only for absence would pass on a binary nothing could read.
     func testThisBuildCarriesExactlyOneChannelMarker() {
-        XCTAssertFalse(
-            ReleaseChannel.isTestingDistribution,
-            "The test bundle builds Debug, which must never claim testing distribution"
-        )
         XCTAssertEqual(ReleaseChannel.marker, "COSMIC_RITUALS_PUBLIC_BUILD")
         XCTAssertNotEqual(
             ReleaseChannel.marker, "COSMIC_RITUALS_TESTING_ACCESS_BUILD",
@@ -139,32 +135,22 @@ final class ReleaseBoundaryTests: XCTestCase {
         )
     }
 
-    /// `true` for testing distribution must exist at exactly one place in the app sources, and
-    /// only inside the compilation fence.
-    func testTestingDistributionIsSetInOneFencedPlaceOnly() throws {
+    /// The testing channel must not grant anything. It once bypassed a
+    /// paywall; the app is free now, so the marker may describe the build but
+    /// must never widen access — there is no access to widen.
+    func testTheTestingChannelGrantsNothing() throws {
         let channel = try text(at: "CosmicRituals/App/ReleaseChannel.swift")
-
-        let trueAssignments = channel.components(separatedBy: "isTestingDistribution = true").count - 1
-        XCTAssertEqual(trueAssignments, 1, "Exactly one place may claim testing distribution")
-
-        guard let fence = channel.range(of: "#if TESTFLIGHT_BETA_ACCESS"),
-              let assignment = channel.range(of: "isTestingDistribution = true"),
-              let elseBranch = channel.range(of: "#else")
-        else {
-            return XCTFail("ReleaseChannel must keep its fence, its assignment and its else branch")
-        }
-        XCTAssertTrue(
-            fence.upperBound < assignment.lowerBound && assignment.upperBound < elseBranch.lowerBound,
-            "The testing assignment must sit inside the #if branch, not after #else"
+        XCTAssertFalse(
+            channel.contains("isTestingDistribution"),
+            "The access bypass must stay deleted; the channel marker is provenance only"
         )
+        XCTAssertTrue(channel.contains("#if TESTFLIGHT_BETA_ACCESS"), "the marker fence remains")
 
         let rootView = try text(at: "CosmicRituals/Views/RootView.swift")
-        XCTAssertFalse(
-            rootView.contains("isTestingDistribution = true"),
-            "RootView must take the channel from ReleaseChannel rather than deciding it inline"
-        )
+        for banned in ["SubscriptionStore", "hasPremiumAccess", "SubscriptionGateView"] {
+            XCTAssertFalse(rootView.contains(banned), "RootView must not gate on \(banned)")
+        }
     }
-
     // MARK: - The guard and the inspector exist and are wired
 
     func testReleaseBoundaryGuardRunsBeforeSourcesInTheAppTarget() throws {

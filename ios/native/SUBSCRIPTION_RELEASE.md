@@ -1,3 +1,12 @@
+> **SUPERSEDED — 2026-08-27.** Cosmic Rituals ships free: the paywall, the
+> `SubscriptionStore`, the StoreKit configuration, and the entitlement checks in
+> App Intents were all removed after the gate failed closed on real devices
+> (products not purchasable in App Store Connect left users at a paywall that
+> could not be priced, with the Panchang unreachable behind it). Nothing in this
+> document describes shipping behaviour any more; it is kept as the record of what
+> the subscription layer was and why it went away. The App Store Connect products
+> can be left unpublished.
+
 # Subscription and release contract
 
 Cosmic Rituals uses StoreKit 2 and App Store-signed transactions. It never starts a

@@ -30,8 +30,7 @@ final class ReleaseBoundaryUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    /// Launches with no arguments at all. `-uiTestingPremium` is compiled out of every
-    /// non-Debug build, and passing it here would only obscure what is being measured.
+    /// Launches with no arguments at all: the app is free and needs none.
     private func launched() -> XCUIApplication {
         let app = XCUIApplication()
         app.launch()
@@ -40,57 +39,35 @@ final class ReleaseBoundaryUITests: XCTestCase {
 
     // MARK: - Public candidate
 
-    /// Run this against `-configuration Release`.
-    func testPublicBuildCarriesThePublicMarkerAndGatesAccess() {
+    /// Run this against `-configuration Release`. The app is free: a public
+    /// build must reach the PRODUCT immediately. It previously had to stop at
+    /// a purchase surface, and that requirement is exactly what stranded real
+    /// devices when the store had nothing to sell — the paywall could not be
+    /// priced and the Panchang could not be reached.
+    func testPublicBuildOpensStraightIntoTheProduct() {
         let app = launched()
 
-        // The channel marker itself is checked in the binary by
-        // scripts/inspect_release_boundary.sh. What this layer adds is the consequence: with
-        // no entitlement and no testing bypass, a public build must stop at a purchase
-        // surface and must never show the testing banner.
         XCTAssertFalse(
             app.descendants(matching: .any).containing(
                 NSPredicate(format: "label CONTAINS 'TestFlight testing access'")
             ).firstMatch.waitForExistence(timeout: 5),
             "A public build must never show the testing-access banner"
         )
-        let gate = app.descendants(matching: .any).matching(identifier: "subscription.gate").firstMatch
-        let unavailable = app.descendants(matching: .any).matching(identifier: "subscription.unavailable").firstMatch
-        if !(gate.waitForExistence(timeout: 30) || unavailable.waitForExistence(timeout: 10)) {
+        for identifier in ["subscription.gate", "subscription.unavailable"] {
+            XCTAssertFalse(
+                app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+                    .waitForExistence(timeout: 3),
+                "The paywall is deleted; \(identifier) must not exist"
+            )
+        }
+
+        let panchang = app.descendants(matching: .any).matching(identifier: "panchang.lunarmonth").firstMatch
+        if !panchang.waitForExistence(timeout: 30) {
             let dump = XCTAttachment(string: app.debugDescription)
             dump.name = "release-build-hierarchy"
             dump.lifetime = .keepAlways
             add(dump)
-            XCTFail("A public build with no entitlement must reach a purchase surface, not the product")
+            XCTFail("A public build must land in the Panchang with no purchase surface")
         }
-    }
-
-    // MARK: - Internal testing build
-
-    /// Run this against `-configuration TestFlight`. It is the positive control: if it fails,
-    /// the check cannot see the difference between the two channels and the Release result
-    /// above means nothing.
-    func testInternalTestingBuildCarriesTheTestingMarker() {
-        let app = launched()
-
-        // An internal tester must reach the product without a purchase, and must be told
-        // plainly that this build does not require one.
-        // Matched on any element, not staticTexts: the banner is a Label inside a
-        // safeAreaInset, and SwiftUI exposes it as one combined element rather than as a
-        // separate static text.
-        let banner = app.descendants(matching: .any).containing(
-            NSPredicate(format: "label CONTAINS 'TestFlight testing access'")
-        ).firstMatch
-        if !banner.waitForExistence(timeout: 30) {
-            let dump = XCTAttachment(string: app.debugDescription)
-            dump.name = "testflight-build-hierarchy"
-            dump.lifetime = .keepAlways
-            add(dump)
-            XCTFail("The internal testing build must show the testing-access banner")
-        }
-        XCTAssertFalse(
-            app.descendants(matching: .any).matching(identifier: "subscription.gate").firstMatch.exists,
-            "The internal testing build must not stop at the purchase gate"
-        )
     }
 }

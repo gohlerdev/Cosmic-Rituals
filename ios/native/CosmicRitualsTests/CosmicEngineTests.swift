@@ -796,77 +796,37 @@ final class CosmicEngineTests: XCTestCase {
         XCTAssertNil(store.mostRecentUnfinishedSession)
     }
 
-    func testSubscriptionPolicyRecognizesOnlyConfiguredProductsAndSecureLegalLinks() {
-        XCTAssertEqual(Set(SubscriptionCatalog.productIDs).count, 2)
-        XCTAssertTrue(SubscriptionCatalog.productIDs.allSatisfy {
-            $0.hasPrefix("com.cosmic.rituals.premium.")
-        })
-        XCTAssertEqual(SubscriptionCatalog.requestedTrialDays, 14)
-        XCTAssertFalse(SubscriptionEntitlementChecker.grantsAccess(activeProductIDs: []))
-        XCTAssertFalse(SubscriptionEntitlementChecker.grantsAccess(activeProductIDs: ["unrelated.product"]))
-        XCTAssertTrue(SubscriptionEntitlementChecker.grantsAccess(
-            activeProductIDs: [SubscriptionCatalog.annualProductID]
-        ))
-        XCTAssertTrue([
-            SubscriptionCatalog.privacyPolicyURL,
-            SubscriptionCatalog.termsOfUseURL,
-            SubscriptionCatalog.supportURL,
-            SubscriptionCatalog.manageSubscriptionsURL
-        ].allSatisfy { $0.scheme == "https" })
-    }
+    /// Cosmic Rituals is free: no paywall, no account, no purchase, and no
+    /// StoreKit code path at all. This pins the absence, because the failure
+    /// this replaces was a store fault locking every user out of an app that
+    /// needs no network — the gate could not even be priced, and there was
+    /// nothing the user could do about it.
+    ///
+    /// The legal links stay: a shipped app owes its users a privacy policy
+    /// and a way to ask for help whether or not it sells anything, and they
+    /// must stay HTTPS.
+    func testTheAppShipsFreeWithNoStoreCodePath() throws {
+        for url in [AppLinks.privacyPolicyURL, AppLinks.termsOfUseURL, AppLinks.supportURL] {
+            XCTAssertEqual(url.scheme, "https", "\(url) must be secure")
+        }
 
-    func testLaunchPolicyKeepsTestingAccessSeparateFromProductionEntitlements() {
-        XCTAssertEqual(
-            SubscriptionLaunchPolicy.initialState(
-                isUITestingPremium: false,
-                isTestingDistribution: false
-            ),
-            .checking
-        )
-        XCTAssertEqual(
-            SubscriptionLaunchPolicy.initialState(
-                isUITestingPremium: true,
-                isTestingDistribution: false
-            ),
-            .entitled
-        )
-        XCTAssertEqual(
-            SubscriptionLaunchPolicy.initialState(
-                isUITestingPremium: false,
-                isTestingDistribution: true
-            ),
-            .testingAccess
-        )
-        XCTAssertTrue(SubscriptionAccessState.testingAccess.hasPremiumAccess)
-        XCTAssertTrue(SubscriptionAccessState.testingAccess.isTestingAccess)
-        XCTAssertFalse(SubscriptionAccessState.entitled.isTestingAccess)
-        XCTAssertFalse(SubscriptionAccessState.storeUnavailable(.offline).hasPremiumAccess)
-    }
-
-    func testStoreKitConfigurationDeclaresTwoWeekTrialsForEveryProduct() throws {
-        let nativeRoot = URL(fileURLWithPath: #filePath)
+        // No source file may reintroduce a purchase path without this failing.
+        let appRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let url = nativeRoot.appendingPathComponent("StoreKit/CosmicRituals.storekit")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
-        let data = try Data(contentsOf: url)
-        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        let groups = try XCTUnwrap(root["subscriptionGroups"] as? [[String: Any]])
-        let subscriptions = groups.flatMap { $0["subscriptions"] as? [[String: Any]] ?? [] }
-
-        XCTAssertEqual(Set(subscriptions.compactMap { $0["productID"] as? String }), Set(SubscriptionCatalog.productIDs))
-        XCTAssertEqual(Set(subscriptions.compactMap { $0["recurringSubscriptionPeriod"] as? String }), ["P1M", "P1Y"])
-
-        for subscription in subscriptions {
-            let productID = try XCTUnwrap(subscription["productID"] as? String)
-            let offers = try XCTUnwrap(subscription["introductoryOffers"] as? [[String: Any]], productID)
-            let offer = try XCTUnwrap(offers.first, productID)
-            XCTAssertEqual(offer["paymentMode"] as? String, "free", productID)
-            XCTAssertEqual(offer["subscriptionPeriod"] as? String, "P2W", productID)
-            XCTAssertEqual(offer["numberOfPeriods"] as? Int, 1, productID)
+            .appendingPathComponent("CosmicRituals")
+        let files = FileManager.default.enumerator(at: appRoot, includingPropertiesForKeys: nil)?
+            .compactMap { $0 as? URL }
+            .filter { $0.pathExtension == "swift" } ?? []
+        XCTAssertFalse(files.isEmpty, "the source tree must be readable for this check to mean anything")
+        for file in files {
+            let source = try String(contentsOf: file, encoding: .utf8)
+            XCTAssertFalse(source.contains("import StoreKit"),
+                           "\(file.lastPathComponent) reintroduces StoreKit")
+            XCTAssertFalse(source.contains("SubscriptionStoreView"),
+                           "\(file.lastPathComponent) reintroduces a paywall view")
         }
     }
-
     func testAccessibilityLargeLocationMetadataKeepsFullTimeZone() {
         XCTAssertEqual(
             RitualResponsiveLayout.locationMetadataLines(

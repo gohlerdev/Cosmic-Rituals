@@ -22,14 +22,14 @@ final class RitualJourneyUITests: XCTestCase {
 
     // MARK: - Launch
 
-    /// `-uiTestingPremium` is compiled out of Release; it exists so automation can reach
+    /// The app is free, so automation needs no access token to reach
     /// the offline product without a live App Store session. `-ritualSelectedDestination`
     /// lands directly on the Pooja surface through the argument domain, which keeps the
     /// test off the themed navigation bar's hit targets.
     @discardableResult
     private func launchApp(extraLaunchArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-uiTestingPremium", "-ritualSelectedDestination", "3"]
+        app.launchArguments = ["-ritualSelectedDestination", "3"]
             + extraLaunchArguments
         app.launch()
         return app

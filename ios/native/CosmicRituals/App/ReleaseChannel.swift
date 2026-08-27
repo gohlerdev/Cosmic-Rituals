@@ -3,6 +3,11 @@ import Foundation
 /// Which distribution channel this binary was compiled for, and — more importantly — the
 /// evidence of that choice inside the compiled product.
 ///
+/// This no longer grants anything. The flag once bypassed a paywall so
+/// internal testers could reach the offline product; the app is now free to
+/// everyone, so only the provenance marker remains — it still answers "which
+/// configuration built this binary?", which a release inspector needs.
+///
 /// The problem this solves: before it existed, a `Release` build and a `TestFlight` build were
 /// byte-indistinguishable apart from `CFBundleVersion`. `NEXT_LEVEL_PLAN.md` Phase 1 asks that
 /// "public archive validation fails if the bypass symbol is present", and there was no symbol
@@ -22,17 +27,11 @@ enum ReleaseChannel {
 
     #if TESTFLIGHT_BETA_ACCESS
 
-    /// Internal testing distribution: purchases are bypassed so testers can reach the offline
-    /// product without a live App Store session. Never valid for public release.
-    static let isTestingDistribution = true
-
     /// Present only in an internal testing build. Its presence in a public candidate is a
     /// release-blocking defect.
     static let marker = "COSMIC_RITUALS_TESTING_ACCESS_BUILD"
 
     #else
-
-    static let isTestingDistribution = false
 
     /// Present in every non-testing build. Its *absence* means the inspector could not read
     /// the binary and must not report a pass.

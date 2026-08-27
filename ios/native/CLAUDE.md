@@ -56,14 +56,15 @@ Three configurations, not the usual two:
 
 | Config | Scheme | Notes |
 |---|---|---|
-| `Debug` | `CosmicRituals` | Defines `DEBUG`; enables the `-uiTestingPremium` launch argument |
+| `Debug` | `CosmicRituals` | Defines `DEBUG` |
 | `Release` | `CosmicRituals` | The only valid public App Store configuration |
 | `TestFlight` | `CosmicRitualsTestFlight` | Defines `TESTFLIGHT_BETA_ACCESS` |
 
-`TESTFLIGHT_BETA_ACCESS` makes `RootView` grant premium access unconditionally so
-internal testers can reach the offline product without a live App Store session. **A
-build made with this configuration must never be promoted or repurposed as a public
-App Store candidate.** A public candidate uses a new build number and the standard
+`TESTFLIGHT_BETA_ACCESS` now only stamps a provenance marker into the binary
+(`ReleaseChannel`), so a release inspector can tell which configuration produced an
+archive. It grants nothing: the app is free, so there is no access to bypass. **A
+build made with this configuration must still never be promoted or repurposed as a
+public App Store candidate.** A public candidate uses a new build number and the standard
 `Release` configuration.
 
 ## Project file
@@ -116,13 +117,18 @@ Rules that the tests enforce and that changes must preserve:
   UI labels the fallback. Muhurta, Choghadiya, Hora, Rahu Kala, Yamaganda, Gulika,
   Abhijit, Brahma Muhurta, and Dur Muhurta simply have no result.
 
-### Subscriptions
+### No paywall
 
-`SubscriptionStore` owns premium access via StoreKit 2, accepting only **verified current
-entitlements** for `com.cosmic.rituals.premium.monthly` / `.premium.annual`. There is no
-local trial timer and no unverified receipt fallback — trial eligibility and localized
-prices come from App Store Connect, never device time. Access is preserved when
-merchandising metadata is temporarily unavailable. App Intents check the same boundary.
+**Cosmic Rituals is free. There is no paywall, no account, no purchase, and no
+StoreKit code path**, and a test (`testTheAppShipsFreeWithNoStoreCodePath`) fails the
+build if any source file reintroduces `import StoreKit` or a `SubscriptionStoreView`.
+
+This replaced a StoreKit 2 subscription gate that failed CLOSED: when the products
+were not purchasable in App Store Connect, real devices reached a paywall that could
+not be priced and a Panchang that could not be opened — an app that needs no network
+at all, sealed by a store fault the user could do nothing about. Everything here is
+computed on-device at no marginal cost, so the gate was never worth its failure mode.
+`AppLinks` keeps the privacy, terms, and support URLs a shipped app owes its users.
 
 ### Ritual session recovery
 

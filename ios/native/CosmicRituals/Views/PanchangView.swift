@@ -1254,26 +1254,24 @@ private struct ThemePickerSheet: View {
 
                         Divider().overlay(theme.semanticDivider).padding(.horizontal)
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Subscription & Support")
+                            Text("Privacy & Support")
                                 .font(.caption.bold())
                                 .foregroundStyle(theme.semanticSecondaryText)
                                 .padding(.bottom, 6)
-                            Link(destination: SubscriptionCatalog.manageSubscriptionsURL) {
-                                Label("Manage subscription", systemImage: "creditcard.fill")
-                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                                    .contentShape(Rectangle())
-                            }
-                            Link(destination: SubscriptionCatalog.privacyPolicyURL) {
+                            Label("Free, with no accounts and no purchases", systemImage: "gift.fill")
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .accessibilityLabel("This app is free. There are no accounts and no purchases.")
+                            Link(destination: AppLinks.privacyPolicyURL) {
                                 Label("Privacy policy", systemImage: "hand.raised.fill")
                                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                                     .contentShape(Rectangle())
                             }
-                            Link(destination: SubscriptionCatalog.termsOfUseURL) {
+                            Link(destination: AppLinks.termsOfUseURL) {
                                 Label("Terms of use", systemImage: "doc.text.fill")
                                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                                     .contentShape(Rectangle())
                             }
-                            Link(destination: SubscriptionCatalog.supportURL) {
+                            Link(destination: AppLinks.supportURL) {
                                 Label("Support", systemImage: "questionmark.circle.fill")
                                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                                     .contentShape(Rectangle())
