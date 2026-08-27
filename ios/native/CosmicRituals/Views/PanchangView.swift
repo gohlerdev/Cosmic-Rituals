@@ -198,6 +198,7 @@ struct PanchangView: View {
         let abhijitMuhurta: (start: Date, end: Date)?
         let moonNakshatra: NakshatraResult
         let sunNakshatra: NakshatraResult
+        let moonRiseSet: (moonrise: Date?, moonset: Date?)
         let durMuhurtas: [(start: Date, end: Date, label: String)]
         let rahuKala: (start: Date, end: Date)?
         let yamaganda: (start: Date, end: Date)?
@@ -215,6 +216,7 @@ struct PanchangView: View {
                 abhijitMuhurta: CosmicEngine.getAbhijitMuhurta(context: context),
                 moonNakshatra: CosmicEngine.getMoonNakshatraPada(context: context),
                 sunNakshatra: CosmicEngine.getSunNakshatra(context: context),
+                moonRiseSet: CelestialRiseSet.moonRiseSet(context: context),
                 durMuhurtas: CosmicEngine.getDurMuhurta(context: context),
                 rahuKala: CosmicEngine.getRahuKala(context: context),
                 yamaganda: CosmicEngine.getYamaganda(context: context),
@@ -313,6 +315,31 @@ struct PanchangView: View {
                                       systemImage: "sun.max.circle")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                            }
+                            Divider()
+                            let moonEvents = resolvedBundle.moonRiseSet
+                            HStack(spacing: 6) {
+                                CosmicIcon(name: "moon.haze.fill", size: 13, color: .cyan)
+                                Text("Moonrise").font(.caption).foregroundStyle(.secondary)
+                                Spacer()
+                                Text(moonEvents.moonrise.map { shortTime($0) } ?? "None this day")
+                                    .font(.caption.bold()).foregroundStyle(.cyan)
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("panchang.moonrise")
+                            HStack(spacing: 6) {
+                                CosmicIcon(name: "moon.fill", size: 13, color: .indigo)
+                                Text("Moonset").font(.caption).foregroundStyle(.secondary)
+                                Spacer()
+                                Text(moonEvents.moonset.map { shortTime($0) } ?? "None this day")
+                                    .font(.caption.bold()).foregroundStyle(.indigo)
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("panchang.moonset")
+                            if moonEvents.moonrise == nil || moonEvents.moonset == nil {
+                                Text("About once a lunar month the rise or set slips past midnight and a civil day genuinely has none.")
+                                    .font(.caption2).foregroundStyle(.tertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         } else {
                             Label("Sunrise-based schedules are unavailable for this latitude and date.",

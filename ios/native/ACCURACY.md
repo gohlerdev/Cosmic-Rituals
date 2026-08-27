@@ -24,6 +24,7 @@ location-aware calculations and explicit limits over unexplained precision.
 | Moon longitude | Complete Meeus table 47.A longitude series plus the leading nutation term, giving apparent-of-date in the same frame as the Sun | Offline compact ephemeris |
 | Sidereal conversion | Lahiri (Chitra Paksha) ayanamsha polynomial | Named in Settings and exports |
 | Sunrise / sunset | Meeus chapter 15 solar altitude crossing at -0.8333 degrees, from the same chapter 25 apparent longitude used for the five limbs (not a separately maintained approximation) | No result for polar day/night |
+| Moonrise / moonset | Meeus chapter 15 iterated crossing, re-evaluating the Moon's apparent position (Table 47.A longitude plus the complete Table 47.B latitude) at every trial instant; standard altitude uses the book's mean +0.125 degrees since the distance series is not carried (about one minute worst case) | A day with no moonrise or moonset shows that fact; it is not smoothed over |
 | Limb transitions | Bracketed 56-step boundary solve for each limb | Tithi, Nakshatra, Yoga, and Karana independently |
 | Muhurta / Choghadiya / Hora | Proportional local day and night divisions | Requires real sunrise, sunset, and next sunrise |
 | Rahu Kala / Yamaganda / Gulika | Weekday-specific eighths of local daylight | Requires real sunrise and sunset |
@@ -87,6 +88,12 @@ recorded beside their sources:
 - Abhijit Muhurta: Mumbai on Friday, plus the Wednesday omission rule.
 - Choghadiya and Hora: published Mumbai Friday sequence and clock times for
   every quality/planet and both day and night halves.
+- Moon latitude: Meeus's own Example 47.a (beta = -3.229126 at JD 2448724.5),
+  with the Table 47.B transcription cross-checked between two independent
+  open-source lineages. Moonrise/moonset: US Naval Observatory API fixtures
+  for New Delhi (rise and set) and Tokyo (rise plus a genuine no-moonset
+  day), on a date where USNO's solar times exactly reproduce this suite's
+  existing timeanddate and NAOJ fixtures.
 - Boundary invariants: multiple seasons and time zones verify that every solved
   transition changes from its declared current value to its declared next value.
 - Civil-time invariants: selected-day preservation east and west of UTC, DST day
@@ -107,7 +114,9 @@ xcodebuild \
 ## Deliberately not claimed as reference-grade
 
 The repository preserves experimental festival, extended Vedic-calendar,
-moonrise/moonset, and low-precision Graha-position work for future development.
+and low-precision Graha-position work for future development. (Moonrise and
+moonset shipped separately via the verified CelestialRiseSet path above; the
+old low-precision moonrise prototype remains unused and must not be revived.)
 Those calculations are not routed into the shipping navigation and must not be
 described as available or reference-grade until they have independent fixtures,
 regional rule handling where applicable, and visible precision disclosures.

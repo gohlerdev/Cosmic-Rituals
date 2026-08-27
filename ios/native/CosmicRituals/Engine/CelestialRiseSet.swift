@@ -129,6 +129,47 @@ enum CelestialRiseSet {
     /// the family's +-12 minute envelope, and disclosed in ACCURACY.md.
     static let moonStandardAltitudeDeg = 0.125
 
+    /// Moonrise and moonset for the selected LOCAL civil day. Solves the
+    /// three surrounding UTC days and keeps the events that land on the
+    /// requested local day -- the same day-mapping discipline the sunrise
+    /// path uses. A nil is a genuine astronomical fact: roughly once a
+    /// lunar month the rise (or set) slips past midnight and a civil day
+    /// has none, and the UI states that instead of hiding the row.
+    static func moonRiseSet(context: CalculationContext) -> (moonrise: Date?, moonset: Date?) {
+        let components = context.localDayComponents
+        guard let y = components.year, let m = components.month, let d = components.day else {
+            return (nil, nil)
+        }
+        var utcCal = Calendar(identifier: .gregorian)
+        utcCal.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        guard let base = utcCal.date(from: DateComponents(year: y, month: m, day: d, hour: 12)) else {
+            return (nil, nil)
+        }
+        let calendar = context.calendar
+        var rise: Date?
+        var set: Date?
+        for offset in -1...1 {
+            guard let dayDate = utcCal.date(byAdding: .day, value: offset, to: base) else { continue }
+            let dc = utcCal.dateComponents([.year, .month, .day], from: dayDate)
+            guard let uy = dc.year, let um = dc.month, let ud = dc.day else { continue }
+            let events = riseSet(
+                utcYear: uy, month: um, day: ud,
+                latDeg: context.latitude, lonDeg: context.longitude,
+                standardAltitudeDeg: moonStandardAltitudeDeg,
+                position: moonEquatorial
+            )
+            if let r = events.rise {
+                let date = CosmicEngine.dateFromUTCHour(r, year: uy, month: um, day: ud)
+                if calendar.isDate(date, inSameDayAs: context.localNoon), rise == nil { rise = date }
+            }
+            if let st = events.set {
+                let date = CosmicEngine.dateFromUTCHour(st, year: uy, month: um, day: ud)
+                if calendar.isDate(date, inSameDayAs: context.localNoon), set == nil { set = date }
+            }
+        }
+        return (rise, set)
+    }
+
     /// The Sun's apparent equatorial position from the engine's own apparent
     /// longitude and mean obliquity -- used by the solar cross-validation and
     /// available to any caller needing solar RA/Dec.

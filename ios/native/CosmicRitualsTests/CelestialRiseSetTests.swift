@@ -67,6 +67,51 @@ final class CelestialRiseSetTests: XCTestCase {
         }
     }
 
+    /// External fixtures from the US Naval Observatory rise/set API
+    /// (aa.usno.navy.mil/api/rstt/oneday), whose sunrise/sunset for the same
+    /// queries exactly reproduce this suite's existing timeanddate and NAOJ
+    /// solar fixtures -- a cross-source confirmation of the reference.
+    func testUSNOMoonriseFixtures() throws {
+        var cal = Calendar(identifier: .gregorian)
+
+        // New Delhi, 2026-07-24 (USNO, tz +5:30): moonrise 15:20,
+        // moonset 00:51 -- both inside the same civil day.
+        let delhi = CalculationContext(
+            localDay: {
+                cal.timeZone = TimeZone(identifier: "Asia/Kolkata")!
+                return cal.date(from: DateComponents(year: 2026, month: 7, day: 24, hour: 12))!
+            }(),
+            latitude: 28.6139, longitude: 77.2090,
+            timeZoneIdentifier: "Asia/Kolkata"
+        )
+        let delhiEvents = CelestialRiseSet.moonRiseSet(context: delhi)
+        let delhiRise = try XCTUnwrap(delhiEvents.moonrise)
+        let delhiSet = try XCTUnwrap(delhiEvents.moonset)
+        cal.timeZone = TimeZone(identifier: "Asia/Kolkata")!
+        let riseParts = cal.dateComponents([.hour, .minute], from: delhiRise)
+        XCTAssertLessThanOrEqual(abs((riseParts.hour! * 60 + riseParts.minute!) - (15 * 60 + 20)), 12)
+        let setParts = cal.dateComponents([.hour, .minute], from: delhiSet)
+        XCTAssertLessThanOrEqual(abs((setParts.hour! * 60 + setParts.minute!) - 51), 12)
+
+        // Tokyo, 2026-07-24 (USNO, tz +9): moonrise 14:52 and NO moonset
+        // that civil day -- the classical monthly skip, asserted as a
+        // genuine nil rather than smoothed over.
+        let tokyo = CalculationContext(
+            localDay: {
+                cal.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+                return cal.date(from: DateComponents(year: 2026, month: 7, day: 24, hour: 12))!
+            }(),
+            latitude: 35.6762, longitude: 139.6503,
+            timeZoneIdentifier: "Asia/Tokyo"
+        )
+        let tokyoEvents = CelestialRiseSet.moonRiseSet(context: tokyo)
+        let tokyoRise = try XCTUnwrap(tokyoEvents.moonrise)
+        cal.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        let tokyoParts = cal.dateComponents([.hour, .minute], from: tokyoRise)
+        XCTAssertLessThanOrEqual(abs((tokyoParts.hour! * 60 + tokyoParts.minute!) - (14 * 60 + 52)), 12)
+        XCTAssertNil(tokyoEvents.moonset, "USNO publishes no moonset for Tokyo on this civil day")
+    }
+
     /// Once a sidereal month, moonrise (or moonset) genuinely skips a civil
     /// day. Over a 31-day window at Delhi's latitude the solver must produce
     /// a rise on most days while being allowed the classical skip -- and it
