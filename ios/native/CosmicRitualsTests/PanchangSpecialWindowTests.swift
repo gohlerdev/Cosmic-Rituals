@@ -137,3 +137,61 @@ final class PanchangSpecialWindowTests: XCTestCase {
         XCTAssertTrue((4...6).contains(longest), "Panchaka runs ~4.5-5 days, got \(longest)")
     }
 }
+
+/// Bhadra windows and the day-rollover rule from the same sweep.
+final class BhadraAndRolloverTests: XCTestCase {
+
+    private func context(_ y: Int, _ m: Int, _ d: Int) -> CalculationContext {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Asia/Kolkata")!
+        return CalculationContext(
+            localDay: cal.date(from: DateComponents(year: y, month: m, day: d, hour: 12))!,
+            latitude: 19.0760, longitude: 72.8777,
+            timeZoneIdentifier: "Asia/Kolkata"
+        )
+    }
+
+    /// Vishti recurs every eight movable karanas (~every 3-4 days) and can
+    /// begin mid-day; over a fortnight the karana timeline must surface
+    /// several Vishti windows, each an actual karana span, including at
+    /// least one that OPENS after sunrise -- the case the sunrise snapshot
+    /// alone always missed.
+    func testVishtiWindowsAppearAcrossAFortnightIncludingMidDayOnsets() throws {
+        var total = 0
+        var opensAfterSunrise = 0
+        for day in 10...24 {
+            let ctx = context(2026, 7, day)
+            let windows = BhadraAdvisory.vishtiWindows(context: ctx)
+            guard let solar = CosmicEngine.getSunriseSunset(context: ctx) else { continue }
+            for window in windows {
+                XCTAssertEqual(window.name, "Vishti")
+                XCTAssertGreaterThan(window.endTime, window.startTime)
+                total += 1
+                if window.startTime > solar.sunrise { opensAfterSunrise += 1 }
+            }
+        }
+        XCTAssertGreaterThanOrEqual(total, 3, "Vishti recurs multiple times a fortnight")
+        XCTAssertGreaterThanOrEqual(opensAfterSunrise, 1, "mid-day onsets must be visible")
+    }
+
+    /// The visible day follows the calendar forward only when the user was
+    /// looking at what was then "today" -- a deliberately selected past date
+    /// is never yanked away.
+    func testDayRolloverAdvancesOnlyWhenFollowingToday() {
+        let tz = TimeZone(identifier: "Asia/Kolkata")!
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let monday = cal.date(from: DateComponents(year: 2026, month: 8, day: 24, hour: 9))!
+        let wednesday = cal.date(from: DateComponents(year: 2026, month: 8, day: 26, hour: 9))!
+
+        // Was looking at "today" (Monday), reopened Wednesday: advance.
+        XCTAssertTrue(PanchangDayRollover.shouldAdvance(
+            selectedDate: monday, knownToday: monday, now: wednesday, timeZone: tz))
+        // Deliberately picked a past date while today was Wednesday: keep it.
+        XCTAssertFalse(PanchangDayRollover.shouldAdvance(
+            selectedDate: monday, knownToday: wednesday, now: wednesday, timeZone: tz))
+        // Still the same day: nothing to do.
+        XCTAssertFalse(PanchangDayRollover.shouldAdvance(
+            selectedDate: monday, knownToday: monday, now: monday.addingTimeInterval(3_600), timeZone: tz))
+    }
+}

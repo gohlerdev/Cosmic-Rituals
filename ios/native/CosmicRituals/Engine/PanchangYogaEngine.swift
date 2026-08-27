@@ -137,4 +137,31 @@ enum BhadraAdvisory {
     static func isActive(karanaIndex: Int) -> Bool {
         karanaIndex == vishtiKaranaIndex
     }
+
+    /// Every Vishti span of the Panchang day, from the karana timeline. The
+    /// karana changes roughly twice per civil day, so Bhadra regularly BEGINS
+    /// mid-day; the previous sunrise-snapshot check missed any window that
+    /// opened after sunrise, while published dailies list every span.
+    static func vishtiWindows(context: CalculationContext) -> [PanchangLimbWindow] {
+        CosmicEngine.limbWindows(for: .karana, context: context)
+            .filter { $0.name == Panchang.karanaNames[vishtiKaranaIndex] }
+    }
+}
+
+/// Decides whether the visible day should follow the calendar forward when
+/// the app returns to the foreground (or midnight passes): only when the
+/// user was looking at what was then "today" -- a deliberately selected past
+/// or future date is never yanked away.
+enum PanchangDayRollover {
+    static func shouldAdvance(
+        selectedDate: Date,
+        knownToday: Date,
+        now: Date,
+        timeZone: TimeZone
+    ) -> Bool {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar.isDate(selectedDate, inSameDayAs: knownToday)
+            && !calendar.isDate(now, inSameDayAs: knownToday)
+    }
 }

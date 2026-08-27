@@ -2,6 +2,8 @@ import SwiftUI
 
 struct PanchangView: View {
     @State private var selectedDate = Date()
+    @State private var knownToday = Date()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var dayBundle: DailyPanchangBundle?
     @State private var detailMuhurta: Muhurta?
     @State private var showThemePicker = false
@@ -157,6 +159,18 @@ struct PanchangView: View {
         }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { date in
             now = date   // tick forces a re-render so isCurrent badges stay accurate
+        }
+        // The app previously kept showing Monday's Panchang when reopened on
+        // Wednesday: nothing refreshed the selected day. Follow the calendar
+        // forward on foreground return and at midnight -- but only when the
+        // user was looking at what was then "today", never yanking away a
+        // deliberately selected date.
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            advanceDayIfStale()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            advanceDayIfStale()
         }
         .task(id: calculationContext) {
             let context = calculationContext
@@ -902,21 +916,30 @@ struct PanchangView: View {
 
         let panchang = bundle.panchang
         let dishaShula = DishaShula.direction(forWeekdayName: panchang.weekdayName)
-        let bhadraActive = BhadraAdvisory.isActive(karanaIndex: panchang.karanaIndex)
 
         return CosmicGlassCard {
             VStack(alignment: .leading, spacing: 10) {
                 CosmicSectionHeader(title: "Inauspicious Periods", icon: "exclamationmark.triangle")
-                if bhadraActive {
-                    HStack(spacing: 6) {
-                        CosmicIcon(name: "hand.raised.fill", size: 13, color: .red)
-                        Text("Bhadra (Vishti karana) is running" +
-                             (panchang.transitions.karana.map { " until \($0.endTime.ritualTransitionLabel(relativeTo: panchang.date, in: calculationContext.timeZone))" } ?? ""))
-                            .font(.caption.bold())
-                            .foregroundStyle(.red)
-                            .fixedSize(horizontal: false, vertical: true)
+                let vishtiWindows = bundle.limbWindows[.karana]?.filter {
+                    $0.name == Panchang.karanaNames[BhadraAdvisory.vishtiKaranaIndex]
+                } ?? []
+                if !vishtiWindows.isEmpty {
+                    ForEach(vishtiWindows.indices, id: \.self) { index in
+                        let window = vishtiWindows[index]
+                        HStack(spacing: 6) {
+                            CosmicIcon(name: "hand.raised.fill", size: 13, color: .red)
+                            Text("Bhadra (Vishti karana)\(window.startTime <= now && now < window.endTime ? " — running now" : "")")
+                                .font(.caption.bold())
+                                .foregroundStyle(.red)
+                            Spacer()
+                            Text("\(window.startTime.ritualTransitionLabel(relativeTo: panchang.date, in: calculationContext.timeZone)) – \(window.endTime.ritualTransitionLabel(relativeTo: panchang.date, in: calculationContext.timeZone))")
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("panchang.bhadra.\(index)")
                     }
-                    Text("Vishti is the one karana classically treated as a standing caution for new undertakings.")
+                    Text("Vishti is the one karana classically treated as a standing caution for new undertakings; every span of this Panchang day is listed.")
                         .font(.caption2).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Divider()
@@ -989,6 +1012,20 @@ struct PanchangView: View {
 
     private func recompute() {
         dayBundle = .compute(for: calculationContext)
+    }
+
+    private func advanceDayIfStale() {
+        let current = Date()
+        if PanchangDayRollover.shouldAdvance(
+            selectedDate: selectedDate,
+            knownToday: knownToday,
+            now: current,
+            timeZone: calculationContext.timeZone
+        ) {
+            selectedDate = current  // recompute follows via onChange
+        }
+        knownToday = current
+        now = current
     }
 
     private func solarTimeCell(icon: String, color: Color, label: String, time: Date) -> some View {
