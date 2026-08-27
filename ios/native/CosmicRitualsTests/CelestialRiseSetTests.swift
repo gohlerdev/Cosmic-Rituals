@@ -7,6 +7,29 @@ import XCTest
 /// end-to-end against Meeus's own worked example before landing.
 final class CelestialRiseSetTests: XCTestCase {
 
+    /// Meeus Example 47.a: 1992 April 12, 0h TD gives Delta = 368409.7 km
+    /// (the book prints Sigma-r = -16 590 875). Pins the Table 47.A distance
+    /// series, transcribed from two agreeing open-source lineages.
+    func testMeeusExample47aMoonDistance() {
+        XCTAssertEqual(CosmicEngine.moonDistanceKm(jdTT: 2_448_724.5), 368_409.7, accuracy: 0.1)
+    }
+
+    /// The parallax-true standard altitude stays inside the physical band
+    /// (perigee to apogee) across an anomalistic month, never collapsing to
+    /// the former fixed mean.
+    func testMoonStandardAltitudeTracksTheDistance() {
+        var low = Double.greatestFiniteMagnitude
+        var high = -Double.greatestFiniteMagnitude
+        let start = CosmicEngine.julianDate(year: 2026, month: 7, day: 1, decimalHour: 0)
+        for offset in 0..<28 {
+            let h0 = CelestialRiseSet.moonStandardAltitudeDeg(jd: start + Double(offset))
+            low = min(low, h0)
+            high = max(high, h0)
+            XCTAssertTrue((0.085...0.185).contains(h0), "day \(offset): \(h0)")
+        }
+        XCTAssertGreaterThan(high - low, 0.03, "the altitude must actually vary with distance")
+    }
+
     /// Meeus Example 47.a (2nd ed., p. 342): 1992 April 12, 0h TD
     /// (JD 2448724.5) gives the Moon's ecliptic latitude -3.229126 degrees.
     /// The book quotes a DYNAMICAL time instant, so this pins the TT entry
@@ -125,7 +148,8 @@ final class CelestialRiseSetTests: XCTestCase {
             let events = CelestialRiseSet.riseSet(
                 utcYear: 2026, month: 7, day: day,
                 latDeg: 28.6139, lonDeg: 77.2090,
-                standardAltitudeDeg: CelestialRiseSet.moonStandardAltitudeDeg,
+                standardAltitudeDeg: CelestialRiseSet.moonStandardAltitudeDeg(
+                    jd: CosmicEngine.julianDate(year: 2026, month: 7, day: day, decimalHour: 12)),
                 position: CelestialRiseSet.moonEquatorial
             )
             if let rise = events.rise {

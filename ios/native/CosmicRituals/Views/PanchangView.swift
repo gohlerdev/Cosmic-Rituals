@@ -3,6 +3,7 @@ import SwiftUI
 struct PanchangView: View {
     @State private var selectedDate = Date()
     @State private var knownToday = Date()
+    @State private var lunarInfo: LunarMonthInfo?
     @Environment(\.scenePhase) private var scenePhase
     @State private var dayBundle: DailyPanchangBundle?
     @State private var detailMuhurta: Muhurta?
@@ -171,6 +172,14 @@ struct PanchangView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
             advanceDayIfStale()
+        }
+        .task(id: calculationContext) {
+            let context = calculationContext
+            lunarInfo = nil
+            let info = await Task.detached(priority: .utility) {
+                LunarCalendarEngine.monthInfo(context: context)
+            }.value
+            if context == calculationContext { lunarInfo = info }
         }
         .task(id: calculationContext) {
             let context = calculationContext
@@ -430,6 +439,8 @@ struct PanchangView: View {
                 panchangYogaCard(for: p)
 
                 personalStarsCard(for: p)
+
+                lunarCalendarCard
 
                 dayTimelineCard
 
@@ -794,6 +805,61 @@ struct PanchangView: View {
             MuhurtaSummaryPill(label: "◐ Mixed",       spokenLabel: "mixed",       count: mixed,        color: .orange)
             MuhurtaSummaryPill(label: "✕ Avoid",       spokenLabel: "to avoid",    count: inauspicious, color: .red)
         }
+    }
+
+    /// Masa (Amanta and Purnimanta), paksha, Adhika, Vikram/Shaka years, and
+    /// Ayana -- the real lunisolar construction (sankranti-inside-lunation),
+    /// replacing the quarantined sun-sign approximation, computed off-main.
+    @ViewBuilder
+    private var lunarCalendarCard: some View {
+        CosmicGlassCard {
+            VStack(alignment: .leading, spacing: 8) {
+                CosmicSectionHeader(title: "Lunar Calendar", icon: "moon.stars.fill")
+                if let info = lunarInfo {
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Amanta").font(.caption2).foregroundStyle(.tertiary)
+                            Text(info.amantaMasaName).font(.subheadline.bold())
+                        }
+                        Divider().frame(height: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Purnimanta").font(.caption2).foregroundStyle(.tertiary)
+                            Text(info.purnimantaMasaName).font(.subheadline.bold())
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(info.pakshaName).font(.caption.bold()).foregroundStyle(theme.primary)
+                            Text(LunarCalendarEngine.ayanaName(context: calculationContext))
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("panchang.lunarmonth")
+                    if info.isAdhika {
+                        Text("ADHIKA MASA — this lunation contains no sankranti and borrows the following month's name; observances follow regional convention.")
+                            .font(.system(size: 9, weight: .black)).foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if info.isKshaya {
+                        Text("KSHAYA MASA — two sankrantis fall in this rare lunation.")
+                            .font(.system(size: 9, weight: .black)).foregroundStyle(.red)
+                    }
+                    HStack(spacing: 12) {
+                        Text("Vikram Samvat \(String(info.vikramYear))")
+                        Text("Shaka \(String(info.shakaYear))")
+                    }
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    .accessibilityElement(children: .combine)
+                    Text("Years increment at Chaitra Shukla Pratipada (North-Indian anchor; Gujarat's Kartika-anchored Vikram variant differs). Ayana follows the sidereal Sun, the Makar-Sankranti tradition; the solstice-based reckoning differs.")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("Computing the lunisolar month…")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.horizontal)
     }
 
     /// Every limb window of the Panchang day -- the block a printed daily

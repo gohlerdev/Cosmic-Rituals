@@ -121,13 +121,17 @@ enum CelestialRiseSet {
         )
     }
 
-    /// Standard altitude for moonrise/moonset. Meeus ch. 15 gives
-    /// h0 = 0.7275 * parallax - 0 deg 34'; the mean value +0.125 deg is the
-    /// book's own stated adequate approximation, adopted here because the
-    /// distance series (Table 47.A's cosine column) is not carried by this
-    /// engine. Worst-case effect is about a minute of rise time, well inside
-    /// the family's +-12 minute envelope, and disclosed in ACCURACY.md.
-    static let moonStandardAltitudeDeg = 0.125
+    /// Standard altitude for moonrise/moonset from the TRUE horizontal
+    /// parallax at the given instant: Meeus ch. 15, h0 = 0.7275 pi - 34',
+    /// with sin(pi) = 6378.14 km / Delta and Delta from the now-carried
+    /// Table 47.A distance series. Ranges ~0.088 to 0.180 degrees across
+    /// the anomalistic month; the former fixed mean (+0.125) could err
+    /// about a minute of rise time, more at high latitudes.
+    static func moonStandardAltitudeDeg(jd: Double) -> Double {
+        let delta = CosmicEngine.moonDistanceKm(jd: jd)
+        let parallax = asin(6_378.14 / delta) * 180 / .pi
+        return 0.7275 * parallax - 34.0 / 60.0
+    }
 
     /// Moonrise and moonset for the selected LOCAL civil day. Solves the
     /// three surrounding UTC days and keeps the events that land on the
@@ -152,10 +156,11 @@ enum CelestialRiseSet {
             guard let dayDate = utcCal.date(byAdding: .day, value: offset, to: base) else { continue }
             let dc = utcCal.dateComponents([.year, .month, .day], from: dayDate)
             guard let uy = dc.year, let um = dc.month, let ud = dc.day else { continue }
+            let dayNoonJD = CosmicEngine.julianDate(year: uy, month: um, day: ud, decimalHour: 12)
             let events = riseSet(
                 utcYear: uy, month: um, day: ud,
                 latDeg: context.latitude, lonDeg: context.longitude,
-                standardAltitudeDeg: moonStandardAltitudeDeg,
+                standardAltitudeDeg: moonStandardAltitudeDeg(jd: dayNoonJD),
                 position: moonEquatorial
             )
             if let r = events.rise {

@@ -357,6 +357,80 @@ enum CosmicEngine {
     /// (JD 2448724.5 TD: beta = -3.229126) in the fixture test. Latitude is
     /// unaffected by nutation in longitude, so no apparent correction
     /// applies here.
+    /// Earth-Moon distance in kilometres for a UT Julian date.
+    static func moonDistanceKm(jd: Double) -> Double {
+        moonDistanceKm(jdTT: terrestrialJD(fromUT: jd))
+    }
+
+    /// Meeus Table 47.A distance (Sigma-r) series, taking a TT Julian date.
+    /// Coefficients are in 1e-3 km; Delta = 385000.56 km + Sigma-r * 1e-3.
+    /// Transcribed from two independent open-source lineages (astronomia
+    /// moonposition.js and PyMeeus Moon.py) that agree on all 60 rows, and
+    /// pinned to the book's Example 47.a (368409.7 km). Note the final row
+    /// (2,0,-1,-2) is distance-only (its Sigma-l is zero), so this table is
+    /// carried independently of the longitude series.
+    static func moonDistanceKm(jdTT: Double) -> Double {
+        let jd = jdTT
+        let T = (jd - J2000) / 36525.0
+        let t2 = T * T
+        let t3 = t2 * T
+        let t4 = t3 * T
+        let D = normalize360(
+            297.8501921 + 445267.1114034 * T - 0.0018819 * t2
+                + t3 / 545868.0 - t4 / 113065000.0
+        ) * DEG
+        let M = normalize360(
+            357.5291092 + 35999.0502909 * T - 0.0001536 * t2
+                + t3 / 24490000.0
+        ) * DEG
+        let Mp = normalize360(
+            134.9633964 + 477198.8675055 * T + 0.0087414 * t2
+                + t3 / 69699.0 - t4 / 14712000.0
+        ) * DEG
+        let F = normalize360(
+            93.2720950 + 483202.0175233 * T - 0.0036539 * t2
+                - t3 / 3526000.0 + t4 / 863310000.0
+        ) * DEG
+        let E = 1 - 0.002516 * T - 0.0000074 * t2
+
+        // (D, M, M', F, coefficient in 1e-3 km); zero-coefficient rows of
+        // the book's table are omitted (they carry only longitude terms).
+        let terms: [(d: Int, m: Int, mp: Int, f: Int, coefficient: Double)] = [
+            (0, 0, 1, 0, -20_905_355), (2, 0, -1, 0, -3_699_111),
+            (2, 0, 0, 0, -2_955_968), (0, 0, 2, 0, -569_925),
+            (0, 1, 0, 0, 48_888), (0, 0, 0, 2, -3_149),
+            (2, 0, -2, 0, 246_158), (2, -1, -1, 0, -152_138),
+            (2, 0, 1, 0, -170_733), (2, -1, 0, 0, -204_586),
+            (0, 1, -1, 0, -129_620), (1, 0, 0, 0, 108_743),
+            (0, 1, 1, 0, 104_755), (2, 0, 0, -2, 10_321),
+            (0, 0, 1, -2, 79_661), (4, 0, -1, 0, -34_782),
+            (0, 0, 3, 0, -23_210), (4, 0, -2, 0, -21_636),
+            (2, 1, -1, 0, 24_208), (2, 1, 0, 0, 30_824),
+            (1, 0, -1, 0, -8_379), (1, 1, 0, 0, -16_675),
+            (2, -1, 1, 0, -12_831), (2, 0, 2, 0, -10_445),
+            (4, 0, 0, 0, -11_650), (2, 0, -3, 0, 14_403),
+            (0, 1, -2, 0, -7_003), (2, -1, -2, 0, 10_056),
+            (1, 0, 1, 0, 6_322), (2, -2, 0, 0, -9_884),
+            (0, 1, 2, 0, 5_751), (2, -2, -1, 0, -4_950),
+            (2, 0, 1, -2, 4_130), (4, -1, -1, 0, -3_958),
+            (3, 0, -1, 0, 3_258), (2, 1, 1, 0, 2_616),
+            (4, -1, -2, 0, -1_897), (0, 2, -1, 0, -2_117),
+            (2, 2, -1, 0, 2_354), (4, 0, 1, 0, -1_423),
+            (0, 0, 4, 0, -1_117), (4, -1, 0, 0, -1_571),
+            (1, 0, -2, 0, -1_739), (0, 0, 2, -2, -4_421),
+            (0, 2, 1, 0, 1_165), (2, 0, -1, -2, 8_752),
+        ]
+
+        var sum = 0.0
+        for term in terms {
+            let argument = Double(term.d) * D + Double(term.m) * M
+                + Double(term.mp) * Mp + Double(term.f) * F
+            let scale = term.m == 0 ? 1.0 : pow(E, Double(abs(term.m)))
+            sum += term.coefficient * scale * cos(argument)
+        }
+        return 385_000.56 + sum / 1_000.0
+    }
+
     /// Ecliptic lunar latitude for a UT Julian date -- converts to TT
     /// internally, where the Meeus series is defined.
     static func moonLatitude(jd: Double) -> Double {
