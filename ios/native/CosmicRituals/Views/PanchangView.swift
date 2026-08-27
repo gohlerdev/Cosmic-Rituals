@@ -40,7 +40,12 @@ struct PanchangView: View {
                         if choghadiya.isEmpty && hora.isEmpty {
                             SolarScheduleUnavailableView()
                         } else {
-                            ChoghadiyaHoraView(choghadiya: choghadiya, hora: hora)
+                            ChoghadiyaHoraView(
+                                choghadiya: choghadiya,
+                                hora: hora,
+                                prahars: prahars,
+                                dayNightMeasure: dayNightMeasure
+                            )
                         }
                     } else if selectedTab == 2 {
                         muhurtaScrollView
@@ -230,6 +235,8 @@ struct PanchangView: View {
         let varjyam: [PanchangSpecialWindows.SpecialWindow]
         let amritKalam: [PanchangSpecialWindows.SpecialWindow]
         let panchaka: (typeName: String?, active: Bool)
+        let prahars: [Prahar]
+        let dayNightMeasure: DayNightMeasure?
 
         static func compute(for context: CalculationContext) -> DailyPanchangBundle {
             DailyPanchangBundle(
@@ -253,7 +260,9 @@ struct PanchangView: View {
                 }),
                 varjyam: PanchangSpecialWindows.varjyam(context: context),
                 amritKalam: PanchangSpecialWindows.amritKalam(context: context),
-                panchaka: PanchangSpecialWindows.panchaka(context: context)
+                panchaka: PanchangSpecialWindows.panchaka(context: context),
+                prahars: TraditionalClock.prahars(context: context),
+                dayNightMeasure: TraditionalClock.dayNightMeasure(context: context)
             )
         }
     }
@@ -275,6 +284,8 @@ struct PanchangView: View {
     private var sunriseSunset: (Date, Date)? { resolvedBundle.sunriseSunset }
     private var choghadiya: [Choghadiya] { resolvedBundle.choghadiya }
     private var hora: [Hora] { resolvedBundle.hora }
+    private var prahars: [Prahar] { resolvedBundle.prahars }
+    private var dayNightMeasure: DayNightMeasure? { resolvedBundle.dayNightMeasure }
 
     private var poojaDayContext: RitualDayContext {
         let panchang = resolvedPanchang

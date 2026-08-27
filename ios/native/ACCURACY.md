@@ -44,6 +44,51 @@ the solver, not the absolute accuracy of the compact astronomical model. The UI
 uses a conservative plus-or-minus 12 minute validation envelope for externally
 published civil-time comparisons.
 
+## Traditional timekeeping: prahars, Ishta Kaal, ghati counters
+
+`TraditionalClock` adds no astronomy. Every value is derived from the sunrise
+and sunset instants already solved elsewhere, and every entry point returns
+nil or an empty list where sunrise does not exist.
+
+| Quantity | Method | Note |
+|---|---|---|
+| Prahar (1-8) | Four equal quarters of the actual daylight arc, then four of the actual night | Proportional, not three-hour blocks |
+| Ishta Kaal | Elapsed time from the Vedic day's sunrise, in fixed ghati-pala-vipala | Pre-dawn instants resolve to the previous Vedic day |
+| Dinamana / Ratrimana | Daylight and night length in fixed ghatis | Varies with season and latitude by construction |
+| Units | 1 ghati = 24 min = 60 pala (vighati, kala); 1 pala = 60 vipala (lipta, vikala); 60 ghatis = one day and night | Sexagesimal throughout |
+
+Definitions were verified against multiple independent sources before
+implementation. The capability was identified from a competitor listing; none
+of the definitions were taken from it. The unit ratios and the alternate unit
+names are attested at sankul.org/ghati; the Ishta Kaal x2.5-per-hour rule was
+cross-checked against a published worked example (sunrise 06:30, instant 16:30
+-> 10 hours -> exactly 25 ghatis); the proportional prahar construction is
+stated explicitly by Wikipedia's "Prahara" article, which notes prahars are
+three hours each only near the equator; and the eight names are attested at
+bhaktibharat.com and thedivineindia.com independently of any app listing.
+
+**Two disclosed divergences, surfaced in the app rather than silently resolved:**
+
+1. **Ghati convention.** The fixed 24-minute ghati ships, so dinamana moves
+   through the year — which is the reason classical panchangs print dinamana at
+   all. A competing "30-ghati clock" divides daylight into 30 parts and night
+   into 30, making dinamana a constant 30 by construction. Both are in
+   circulation. The fixed ghati is the convention the Ishta Kaal rule and its
+   worked examples assume, and dinamana is displayed precisely so a reader can
+   see which convention is in force.
+2. **Prahar duration.** A contemporary operational scheme pins prahars to fixed
+   clock hours (3-6am, 6-9am, ...) and in doing so swaps Madhyahna and Aparahna
+   relative to the traditional sunrise-anchored order. The traditional
+   proportional scheme is what ships.
+
+Consequence worth stating plainly: prahars are proportional while ghatis are
+fixed, so a day prahar equals 7.5 ghatis only at the equinox. The two units are
+not reconciled here because the tradition does not reconcile them.
+
+Both decisions carry negative controls. Reimplementing prahars as fixed
+three-hour blocks turns four tests red, and switching dinamana to the
+proportional 30-ghati reading turns two red.
+
 ## Vara-Nakshatra combination yogas
 
 `PanchangYogaEngine` cross-references the weekday and the already-computed
