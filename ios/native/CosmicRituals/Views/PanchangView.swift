@@ -203,6 +203,10 @@ struct PanchangView: View {
         let rahuKala: (start: Date, end: Date)?
         let yamaganda: (start: Date, end: Date)?
         let gulikaKala: (start: Date, end: Date)?
+        let limbWindows: [PanchangLimbKind: [PanchangLimbWindow]]
+        let varjyam: [PanchangSpecialWindows.SpecialWindow]
+        let amritKalam: [PanchangSpecialWindows.SpecialWindow]
+        let panchaka: (typeName: String?, active: Bool)
 
         static func compute(for context: CalculationContext) -> DailyPanchangBundle {
             DailyPanchangBundle(
@@ -220,7 +224,13 @@ struct PanchangView: View {
                 durMuhurtas: CosmicEngine.getDurMuhurta(context: context),
                 rahuKala: CosmicEngine.getRahuKala(context: context),
                 yamaganda: CosmicEngine.getYamaganda(context: context),
-                gulikaKala: CosmicEngine.getGulikaKala(context: context)
+                gulikaKala: CosmicEngine.getGulikaKala(context: context),
+                limbWindows: Dictionary(uniqueKeysWithValues: PanchangLimbKind.allCases.map {
+                    ($0, CosmicEngine.limbWindows(for: $0, context: context))
+                }),
+                varjyam: PanchangSpecialWindows.varjyam(context: context),
+                amritKalam: PanchangSpecialWindows.amritKalam(context: context),
+                panchaka: PanchangSpecialWindows.panchaka(context: context)
             )
         }
     }
@@ -406,6 +416,8 @@ struct PanchangView: View {
                 panchangYogaCard(for: p)
 
                 personalStarsCard(for: p)
+
+                dayTimelineCard
 
                 inauspiciousKalaCard
 
@@ -768,6 +780,117 @@ struct PanchangView: View {
             MuhurtaSummaryPill(label: "◐ Mixed",       spokenLabel: "mixed",       count: mixed,        color: .orange)
             MuhurtaSummaryPill(label: "✕ Avoid",       spokenLabel: "to avoid",    count: inauspicious, color: .red)
         }
+    }
+
+    /// Every limb window of the Panchang day -- the block a printed daily
+    /// panchang publishes: each tithi/nakshatra/yoga/karana with its start
+    /// and end, including kshaya windows that never touch a sunrise and
+    /// vriddhi values spanning both.
+    private var dayTimelineCard: some View {
+        let bundle = resolvedBundle
+        let anchor = bundle.panchang.date
+        let kinds: [(PanchangLimbKind, String)] = [
+            (.tithi, "Tithi"), (.nakshatra, "Nakshatra"), (.yoga, "Yoga"), (.karana, "Karana"),
+        ]
+        return CosmicGlassCard {
+            VStack(alignment: .leading, spacing: 10) {
+                CosmicSectionHeader(title: "Day Timeline", icon: "timeline.selection")
+                Text("Every limb window from this sunrise to the next, as a printed panchang lists them.")
+                    .font(.caption2).foregroundStyle(.secondary)
+                specialWindowRows(bundle: bundle, anchor: anchor)
+                Divider()
+                ForEach(kinds, id: \.0) { kind, label in
+                    if let windows = bundle.limbWindows[kind], !windows.isEmpty {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(label).font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                            ForEach(windows.indices, id: \.self) { index in
+                                let window = windows[index]
+                                HStack(spacing: 6) {
+                                    Text(window.name)
+                                        .font(.caption.bold())
+                                        .foregroundStyle(theme.primary)
+                                    Spacer()
+                                    Text("\(window.startTime.ritualTransitionLabel(relativeTo: anchor, in: calculationContext.timeZone)) – \(window.endTime.ritualTransitionLabel(relativeTo: anchor, in: calculationContext.timeZone))")
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundStyle(.secondary)
+                                }
+                                .accessibilityElement(children: .combine)
+                            }
+                        }
+                        if kind != .karana { Divider() }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal)
+        .accessibilityIdentifier("panchang.daytimeline")
+    }
+
+    /// Varjyam / Amrit Kalam spans, the Anandadi day-yoga per nakshatra,
+    /// and the Ganda Mula / Panchaka flags. All table-driven from
+    /// independently verified sources (see ACCURACY.md).
+    @ViewBuilder
+    private func specialWindowRows(bundle: DailyPanchangBundle, anchor: Date) -> some View {
+        let weekday = calculationContext.localDayComponents.weekday ?? 1
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(bundle.varjyam.indices, id: \.self) { index in
+                let window = bundle.varjyam[index]
+                HStack(spacing: 6) {
+                    Text("Varjyam").font(.caption.bold()).foregroundStyle(.red)
+                    Text("(\(window.nakshatraName))").font(.caption2).foregroundStyle(.tertiary)
+                    Spacer()
+                    Text("\(window.startTime.ritualTransitionLabel(relativeTo: anchor, in: calculationContext.timeZone)) – \(window.endTime.ritualTransitionLabel(relativeTo: anchor, in: calculationContext.timeZone))")
+                        .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("panchang.varjyam.\(index)")
+            }
+            ForEach(bundle.amritKalam.indices, id: \.self) { index in
+                let window = bundle.amritKalam[index]
+                HStack(spacing: 6) {
+                    Text("Amrit Kalam").font(.caption.bold()).foregroundStyle(.green)
+                    Text("(\(window.nakshatraName))").font(.caption2).foregroundStyle(.tertiary)
+                    Spacer()
+                    Text("\(window.startTime.ritualTransitionLabel(relativeTo: anchor, in: calculationContext.timeZone)) – \(window.endTime.ritualTransitionLabel(relativeTo: anchor, in: calculationContext.timeZone))")
+                        .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("panchang.amritkalam.\(index)")
+            }
+            if let nakWindows = bundle.limbWindows[.nakshatra] {
+                ForEach(nakWindows.indices, id: \.self) { index in
+                    let window = nakWindows[index]
+                    if let nakIndex = nakshatraIndex(named: window.name),
+                       let yogaIndex = PanchangSpecialWindows.anandadiIndex(weekday: weekday, nakshatraIndex: nakIndex) {
+                        let yoga = PanchangSpecialWindows.anandadiYogas[yogaIndex]
+                        HStack(spacing: 6) {
+                            Text("Anandadi").font(.caption.bold()).foregroundStyle(.purple)
+                            Text("\(yoga.name)\(yoga.isAuspicious ? "" : " · caution") during \(window.name)")
+                                .font(.caption2).foregroundStyle(.secondary)
+                            Spacer()
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            }
+            HStack(spacing: 8) {
+                if let nakIndex = nakshatraIndex(named: bundle.panchang.nakshatraName),
+                   PanchangSpecialWindows.isGandaMula(nakshatraIndex: nakIndex) {
+                    Text("GANDA MULA NAKSHATRA")
+                        .font(.system(size: 9, weight: .black))
+                        .foregroundStyle(.orange)
+                }
+                if bundle.panchaka.active {
+                    Text("PANCHAKA\(bundle.panchaka.typeName.map { " · \($0)" } ?? "")")
+                        .font(.system(size: 9, weight: .black))
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+    }
+
+    private func nakshatraIndex(named name: String) -> Int? {
+        Panchang.nakshatraNames.firstIndex(of: name)
     }
 
     private var inauspiciousKalaCard: some View {

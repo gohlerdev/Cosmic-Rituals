@@ -452,7 +452,7 @@ enum CosmicEngine {
         )
     }
 
-    private static func panchangReferenceDate(for context: CalculationContext) -> Date {
+    static func panchangReferenceDate(for context: CalculationContext) -> Date {
         getSunriseSunset(context: context)?.sunrise ?? context.localNoon
     }
 
@@ -547,6 +547,94 @@ enum CosmicEngine {
         let segmentSize: Double
         let currentName: String
         let nextName: String
+    }
+
+    /// The instant the CURRENT limb value began -- the previous boundary at
+    /// or before `date`, solved by the same bracketed bisection running
+    /// backwards. Nil only if no boundary exists within 72 hours (never for
+    /// real limbs, whose segments are far shorter).
+    private static func previousTransitionTime(
+        for kind: PanchangLimbKind,
+        before date: Date
+    ) -> Date? {
+        let initial = limbTransitionState(for: kind, at: date)
+        let remainder = initial.angle.truncatingRemainder(dividingBy: initial.segmentSize)
+        // At (or within noise of) a boundary the current value began now.
+        if remainder < 1e-10 { return date }
+
+        func elapsedAngle(at candidate: Date) -> Double {
+            let angle = limbTransitionState(for: kind, at: candidate).angle
+            return normalize360(initial.angle - angle)
+        }
+
+        var lower = date.addingTimeInterval(-36 * 3_600)
+        var upper = date
+        while elapsedAngle(at: lower) < remainder,
+              date.timeIntervalSince(lower) < 72 * 3_600 {
+            lower = lower.addingTimeInterval(-12 * 3_600)
+        }
+        guard elapsedAngle(at: lower) >= remainder else { return nil }
+
+        for _ in 0..<56 {
+            let midpoint = lower.addingTimeInterval(upper.timeIntervalSince(lower) / 2)
+            if elapsedAngle(at: midpoint) >= remainder {
+                lower = midpoint
+            } else {
+                upper = midpoint
+            }
+        }
+        return lower.addingTimeInterval(upper.timeIntervalSince(lower) / 2)
+    }
+
+    /// Every window of one limb across the Panchang day: from the value
+    /// already running at the day anchor through the value running at the
+    /// next day anchor. The day is sunrise-anchored (sunrise to next
+    /// sunrise); where sunrise does not exist the local civil day stands in,
+    /// matching the snapshot's disclosed fallback. This is the block a
+    /// published daily panchang prints: starts, ends, kshaya windows that
+    /// never touch a sunrise, and vriddhi values spanning both.
+    static func limbWindows(
+        for kind: PanchangLimbKind,
+        context: CalculationContext
+    ) -> [PanchangLimbWindow] {
+        let anchorStart: Date
+        let anchorEnd: Date
+        if let today = getSunriseSunset(context: context),
+           let tomorrow = getSunriseSunset(context: context.advancedByLocalDays(1)) {
+            anchorStart = today.sunrise
+            anchorEnd = tomorrow.sunrise
+        } else {
+            var cal = context.calendar
+            cal.timeZone = context.timeZone
+            let midnight = cal.startOfDay(for: context.localNoon)
+            guard let next = cal.date(byAdding: .day, value: 1, to: midnight) else { return [] }
+            anchorStart = midnight
+            anchorEnd = next
+        }
+
+        guard var cursor = previousTransitionTime(for: kind, before: anchorStart) else { return [] }
+        var windows: [PanchangLimbWindow] = []
+        // A limb segment is at least ~6.5 h (karana at lunar perigee); 64
+        // iterations is an order of magnitude beyond any real day.
+        for _ in 0..<64 {
+            // Query 30 s past the cursor: the cursor sits on a bisected
+            // boundary, and an epsilon-early solution would otherwise read
+            // as "almost a full segment elapsed" and return an immediate
+            // zero-length duplicate. Real segments are hours long, so the
+            // nudge cannot skip one; it also guarantees the state reports
+            // the NEW value's name.
+            guard let transition = nextTransition(for: kind, after: cursor.addingTimeInterval(30)),
+                  transition.endTime > cursor else { break }
+            windows.append(PanchangLimbWindow(
+                kind: kind,
+                name: transition.currentName,
+                startTime: cursor,
+                endTime: transition.endTime
+            ))
+            cursor = transition.endTime
+            if cursor >= anchorEnd { break }
+        }
+        return windows
     }
 
     private static func nextTransition(
@@ -1313,7 +1401,7 @@ enum CosmicEngine {
         return normalized > 180 ? normalized - 360 : normalized
     }
 
-    private static func siderealize(_ tropical: Double, jd: Double) -> Double {
+    static func siderealize(_ tropical: Double, jd: Double) -> Double {
         let year = 2000.0 + (jd - J2000) / 365.25
         return normalize360(tropical - lahiriAyanamsha(year: year))
     }

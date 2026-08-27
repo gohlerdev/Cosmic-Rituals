@@ -80,6 +80,18 @@ struct PanchangTransition: Codable, Equatable, Sendable {
     let endTime: Date
 }
 
+/// One continuous span of a single limb value (a tithi, nakshatra, yoga, or
+/// karana window) inside a Panchang day. The first window of a day normally
+/// STARTS before sunrise (the limb was already running); a window that both
+/// starts and ends strictly inside the day is the classical kshaya case for
+/// tithis, and a day with a single window spanning both sunrises is vriddhi.
+struct PanchangLimbWindow: Codable, Equatable, Sendable {
+    let kind: PanchangLimbKind
+    let name: String
+    let startTime: Date
+    let endTime: Date
+}
+
 struct PanchangTransitions: Codable, Equatable, Sendable {
     let tithi: PanchangTransition?
     let nakshatra: PanchangTransition?

@@ -84,6 +84,43 @@ struct TodayPanchangIntent: AppIntent {
 
 // MARK: - "When's the next auspicious time?" Intent
 
+struct InauspiciousPeriodsIntent: AppIntent {
+    static let title: LocalizedStringResource = "Today's Inauspicious Kalas"
+    static let description = IntentDescription("Rahu Kala, Yamaganda, and Gulika Kala for today, and whether one is running now.")
+
+    @MainActor
+    func perform() async throws -> some ReturnsValue<String> & ProvidesDialog {
+        guard await SubscriptionEntitlementChecker.grantsCurrentAccess() else {
+            let reply = "Open Cosmic Rituals to start or restore Premium before using this shortcut."
+            return .result(value: reply, dialog: IntentDialog(stringLiteral: reply))
+        }
+        let now = Date()
+        guard let (context, location) = IntentCalculationContext.resolve(for: now) else {
+            let reply = "Open Cosmic Rituals and choose a calculation location before using this shortcut."
+            return .result(value: reply, dialog: IntentDialog(stringLiteral: reply))
+        }
+        let kalas: [(String, (start: Date, end: Date)?)] = [
+            ("Rahu Kala", CosmicEngine.getRahuKala(context: context)),
+            ("Yamaganda", CosmicEngine.getYamaganda(context: context)),
+            ("Gulika Kala", CosmicEngine.getGulikaKala(context: context)),
+        ]
+        guard kalas.contains(where: { $0.1 != nil }) else {
+            let reply = "No sunrise exists for \(location.name) today, so the sunrise-based kalas do not exist."
+            return .result(value: reply, dialog: IntentDialog(stringLiteral: reply))
+        }
+        var parts: [String] = []
+        var runningNow: String?
+        for (name, window) in kalas {
+            guard let window else { continue }
+            parts.append("\(name) \(shortTime(window.start, in: context.timeZone))–\(shortTime(window.end, in: context.timeZone))")
+            if window.start <= now, now < window.end { runningNow = name }
+        }
+        let status = runningNow.map { "\($0) is running right now. " } ?? ""
+        let reply = status + "Today at \(location.name): " + parts.joined(separator: ", ") + "."
+        return .result(value: reply, dialog: IntentDialog(stringLiteral: reply))
+    }
+}
+
 struct NextAuspiciousTimeIntent: AppIntent {
     static let title: LocalizedStringResource = "Next Auspicious Muhurta"
     static let description = IntentDescription("Find the next excellent or auspicious muhurta today.")
@@ -109,7 +146,14 @@ struct NextAuspiciousTimeIntent: AppIntent {
         }
         if let m = upcoming {
             let when = m.isCurrent ? "right now" : "at \(shortTime(m.startTime, in: context.timeZone))"
-            let reply = "The next auspicious muhurta is \(m.name) — \(m.quality.rawValue) — \(when)."
+            var reply = "The next auspicious muhurta is \(m.name) — \(m.quality.rawValue) — \(when)."
+            // The screen shows the kala card next to the muhurta list; a
+            // voice answer must carry the same caveat instead of silently
+            // recommending a window that overlaps Rahu Kala.
+            if let rahu = CosmicEngine.getRahuKala(context: context),
+               m.startTime < rahu.end, rahu.start < m.endTime {
+                reply += " Note: it overlaps Rahu Kala (\(shortTime(rahu.start, in: context.timeZone))–\(shortTime(rahu.end, in: context.timeZone))), which tradition treats as inauspicious."
+            }
             return .result(value: reply, dialog: IntentDialog(stringLiteral: reply))
         } else {
             return .result(value: "No more auspicious muhurtas today.", dialog: "No more auspicious muhurtas today.")
@@ -150,6 +194,16 @@ struct CosmicShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Next Auspicious Time",
             systemImageName: "star.circle.fill"
+        )
+        AppShortcut(
+            intent: InauspiciousPeriodsIntent(),
+            phrases: [
+                "When is Rahu Kala in \(.applicationName)",
+                "Is now inauspicious in \(.applicationName)",
+                "Today's inauspicious times in \(.applicationName)"
+            ],
+            shortTitle: "Inauspicious Kalas",
+            systemImageName: "exclamationmark.triangle.fill"
         )
     }
 }
