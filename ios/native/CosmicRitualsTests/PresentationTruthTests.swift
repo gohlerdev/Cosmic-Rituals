@@ -122,3 +122,24 @@ final class PresentationTruthTests: XCTestCase {
         XCTAssertTrue(found, "the Moon rises or sets on at least one polar-day date in the window")
     }
 }
+
+
+/// The Bengal panjika-lineage disclosure: the app computes drik-style tithis,
+/// and in Bengal that is one of two live schools (Bisuddhasiddhanta vs. the
+/// Gupta Press Surya-Siddhanta line), which publish different festival dates.
+/// The sentence must ship in the panchang source, not only in documentation.
+final class BengalLineageDisclosureTests: XCTestCase {
+    func testTheDisclosureShipsInThePanchangSurface() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // CosmicRitualsTests
+            .deletingLastPathComponent()   // ios/native
+            .appendingPathComponent("CosmicRituals/Views/PanchangView.swift")
+        let source = try String(contentsOf: root, encoding: .utf8)
+        XCTAssertTrue(source.contains("Bisuddhasiddhanta"),
+                      "the drik lineage is named")
+        XCTAssertTrue(source.contains("Gupta Press"),
+                      "the Surya-Siddhanta lineage is named")
+        XCTAssertTrue(source.contains("one school's answer, not the canonical one"),
+                      "the app does not claim canonicity in Bengal")
+    }
+}

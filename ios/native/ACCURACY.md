@@ -107,6 +107,15 @@ Era years ship only where verified: Kollam (CE − 824 from Chingam, − 825
 before) and the Bengali San (CE − 593 from Boishakh, − 594 before). The Tamil
 sixty-year name cycle and Odisha's anka regnal year are not implemented.
 
+**The Bengal panjika-lineage split, disclosed on the surface.** Bengal runs
+two live computational schools — drik-siddhanta (the Bisuddhasiddhanta
+Panjika, computed from observed planetary positions since 1890) and the
+Surya-Siddhanta line (Gupta Press and others) — and they can place tithis and
+festivals on different dates (Durga Puja 2005 circulated two date sets). This
+app computes drik-style throughout; the panchang surface says plainly that in
+Bengal this is one school's answer, not the canonical one, and a test fails if
+that sentence is dropped.
+
 **Three disclosed limits.** (1) Bengal's 23:36–00:24 temporal-time special
 zone has month- and weekday-dependent sub-rules the consulted source does not
 publish; a sankranti inside that window (apparent midnight ± 24 temporal

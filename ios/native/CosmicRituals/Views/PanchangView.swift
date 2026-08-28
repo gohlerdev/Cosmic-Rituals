@@ -904,6 +904,10 @@ struct PanchangView: View {
                         Text("Each region names its solar month by its own day rule (Dershowitz-Reingold formalization): Odisha any-time, Tamil sunset, Kerala three-fifths of daylight, Bengal next civil day. Bangladesh's reformed fixed calendar is a different construction and is not computed. A warning marks a start within the solver's ±60-minute envelope of a rule boundary, or Bengal's unpublished midnight special zone.")
                             .font(.caption2).foregroundStyle(.tertiary)
                             .fixedSize(horizontal: false, vertical: true)
+                        Text("Bengal note: two panjika lineages are live — drik-siddhanta (Bisuddhasiddhanta, computed from observed planetary positions) and the Surya-Siddhanta line (Gupta Press and others) — and they can place tithis and festivals on different dates. This app computes drik-style throughout; in Bengal that is one school's answer, not the canonical one.")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("panchang.bengal.lineage")
                     }
                 } else {
                     Text("Computing the lunisolar month…")
