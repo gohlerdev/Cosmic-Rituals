@@ -21,7 +21,7 @@ struct MuhurtaDetailView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                CosmicStarfieldBackground()
+                RitualSanctuaryBackground()
                 ScrollView {
                     VStack(spacing: 16) {
                         header
@@ -156,11 +156,14 @@ struct MuhurtaDetailView: View {
                         .foregroundStyle(color)
                         .frame(width: 16)
                         .padding(.top, 2)
+                        .accessibilityHidden(true)
                     Text(item)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(title), \(item)")
             }
         }
     }

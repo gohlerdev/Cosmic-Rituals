@@ -35,11 +35,76 @@ enum CosmicEngine {
     }
 
     static func julianDateFromDate(_ date: Date) -> Double {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
-        let comps = cal.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
-        let hour = Double(comps.hour ?? 12) + Double(comps.minute ?? 0) / 60.0 + Double(comps.second ?? 0) / 3600.0
-        return julianDate(year: comps.year ?? 2000, month: comps.month ?? 1, day: comps.day ?? 1, decimalHour: hour)
+        // JD of the Unix epoch plus elapsed days -- exact for the Gregorian
+        // calendar and sub-second, where the previous component-based form
+        // truncated to whole seconds (making the solver's "sub-second
+        // convergence" claim quietly false at the input boundary).
+        2_440_587.5 + date.timeIntervalSince1970 / 86_400.0
+    }
+
+    // MARK: - Delta T (TT - UT, Espenak-Meeus piecewise polynomials)
+
+    /// The Meeus series are defined in Terrestrial (dynamical) Time; civil
+    /// timestamps are UT. Evaluating the series directly at a UT Julian date
+    /// lagged the Moon ~38 arcseconds (about +70-75 s on every tithi,
+    /// nakshatra, yoga, and karana end time in 2026, growing each year).
+    /// Espenak-Meeus piecewise polynomials, same model the sibling Cosmic
+    /// Astrology engine carries; the 2005-2050 branch is that model's own
+    /// projection and reads a few seconds above measured IERS Delta T, which
+    /// is far inside the published +-12 minute envelope and disclosed in
+    /// ACCURACY.md.
+    static func deltaTSeconds(year: Double) -> Double {
+        switch year {
+        case ..<948:
+            let u = (year - 2000) / 100
+            return 2177 + 497 * u + 44.1 * u * u
+        case 948..<1600:
+            let u = (year - 1000) / 100
+            return 102 + 102 * u + 25.3 * u * u
+        case 1600..<1700:
+            let t = year - 1600
+            return 120 - 0.9808 * t - 0.01532 * t * t + t * t * t / 7129.0
+        case 1700..<1800:
+            let t = year - 1700
+            return 8.83 + 0.1603 * t - 0.0059285 * t * t + 0.00013336 * t * t * t - t * t * t * t / 1_174_000
+        case 1800..<1860:
+            let t = year - 1800
+            return 13.72 - 0.332447 * t + 0.0068612 * t * t + 0.0041116 * t * t * t
+                - 0.00037436 * pow(t, 4) + 0.0000121272 * pow(t, 5)
+                - 0.0000001699 * pow(t, 6) + 0.000000000875 * pow(t, 7)
+        case 1860..<1900:
+            let t = year - 1860
+            return 7.62 + 0.5737 * t - 0.251754 * t * t + 0.01680668 * t * t * t
+                - 0.0004473624 * pow(t, 4) + pow(t, 5) / 233_174
+        case 1900..<1920:
+            let t = year - 1900
+            return -2.79 + 1.494119 * t - 0.0598939 * t * t + 0.0061966 * t * t * t - 0.000197 * pow(t, 4)
+        case 1920..<1941:
+            let t = year - 1920
+            return 21.20 + 0.84493 * t - 0.076100 * t * t + 0.0020936 * t * t * t
+        case 1941..<1961:
+            let t = year - 1950
+            return 29.07 + 0.407 * t - t * t / 233 + t * t * t / 2547
+        case 1961..<1986:
+            let t = year - 1975
+            return 45.45 + 1.067 * t - t * t / 260 - t * t * t / 718
+        case 1986..<2005:
+            let t = year - 2000
+            return 63.86 + 0.3345 * t - 0.060374 * t * t + 0.0017275 * t * t * t
+                + 0.000651814 * pow(t, 4) + 0.00002373599 * pow(t, 5)
+        case 2005..<2050:
+            let t = year - 2000
+            return 62.92 + 0.32217 * t + 0.005589 * t * t
+        default:
+            let u = (year - 1820) / 100
+            return -20 + 32 * u * u
+        }
+    }
+
+    /// UT Julian date -> Terrestrial Time Julian date.
+    static func terrestrialJD(fromUT jd: Double) -> Double {
+        let year = 2000.0 + (jd - J2000) / 365.25
+        return jd + deltaTSeconds(year: year) / 86_400.0
     }
 
     // MARK: - Lahiri Ayanamsha (Chitra Paksha)
@@ -51,9 +116,26 @@ enum CosmicEngine {
 
     // MARK: - Sun (Meeus §25)
 
+    /// Mean solar longitude (Meeus §25), degrees. Shared with
+    /// `sunriseSunsetUTHours` so the two never carry independently drifting
+    /// approximations of the same quantity.
+    private static func sunMeanLongitudeDegrees(T: Double) -> Double {
+        normalize360(280.46646 + 36000.76983 * T + 0.0003032 * T * T)
+    }
+
+    /// Apparent solar longitude for a UT Julian date -- converts to TT
+    /// internally, where the Meeus series is defined.
     static func sunLongitude(jd: Double) -> Double {
+        sunLongitude(jdTT: terrestrialJD(fromUT: jd))
+    }
+
+    /// The series itself, taking a TT (dynamical time) Julian date. Meeus's
+    /// worked examples quote TD instants, so the book fixtures pin this
+    /// entry point directly.
+    static func sunLongitude(jdTT: Double) -> Double {
+        let jd = jdTT
         let T = (jd - J2000) / 36525.0
-        let L0 = normalize360(280.46646 + 36000.76983 * T + 0.0003032 * T * T)
+        let L0 = sunMeanLongitudeDegrees(T: T)
         let M  = normalize360(357.52911 + 35999.05029 * T - 0.0001537 * T * T) * DEG
         let C  = (1.914602 - 0.004817 * T - 0.000014 * T * T) * sin(M)
                 + (0.019993 - 0.000101 * T) * sin(2 * M)
@@ -71,7 +153,15 @@ enum CosmicEngine {
 
     // MARK: - Moon (Meeus §47, complete Table 47.A longitude series)
 
+    /// Apparent lunar longitude for a UT Julian date -- converts to TT
+    /// internally, where the Meeus series is defined.
     static func moonLongitude(jd: Double) -> Double {
+        moonLongitude(jdTT: terrestrialJD(fromUT: jd))
+    }
+
+    /// The series itself, taking a TT Julian date (Meeus worked examples).
+    static func moonLongitude(jdTT: Double) -> Double {
+        let jd = jdTT
         let T = (jd - J2000) / 36525.0
         let t2 = T * T
         let t3 = t2 * T
@@ -181,9 +271,223 @@ enum CosmicEngine {
         let lp = LpDegrees * DEG
         sumL += 3_958 * sin(a1) + 1_962 * sin(lp - F) + 318 * sin(a2)
 
-        // Mean geocentric ecliptic longitude, referred to the mean equinox of date.
+        // Mean geocentric ecliptic longitude, then the same leading-term
+        // nutation the Sun's apparent longitude already carries
+        // (delta-psi ~ -17.20" sin(omega), i.e. -0.00478 deg): both limbs'
+        // inputs are now apparent-of-date in the SAME frame. Before this, the
+        // Sun was apparent and the Moon mean, so the nakshatra silently
+        // lagged nutation (<= 17") while tithi/yoga mixed frames. Nutation
+        // cancels in the Sun-Moon elongation, so tithi keeps only the Sun's
+        // physically-correct aberration. Verified against Meeus example
+        // 47.a's PUBLISHED apparent longitude in the fixture test.
         let lon = LpDegrees + sumL / 1_000_000.0
-        return normalize360(lon)
+        let omega = normalize360(125.04 - 1934.136 * T) * DEG
+        return normalize360(lon - 0.00478 * sin(omega))
+    }
+
+    /// Meeus Table 47.B latitude terms (D, M, M', F, coefficient in 1e-6 deg),
+    /// transcribed from two independent open-source transcription lineages
+    /// (soniakeys/meeus and PyMeeus) that agree on all 60 rows, and verified
+    /// end-to-end against the book's Example 47.a before landing.
+    private static let latitudeTerms: [(d: Int, m: Int, moonAnomaly: Int, f: Int, coefficient: Double)] = [
+        (0, 0, 0, 1, 5128122),
+        (0, 0, 1, 1, 280602),
+        (0, 0, 1, -1, 277693),
+        (2, 0, 0, -1, 173237),
+        (2, 0, -1, 1, 55413),
+        (2, 0, -1, -1, 46271),
+        (2, 0, 0, 1, 32573),
+        (0, 0, 2, 1, 17198),
+        (2, 0, 1, -1, 9266),
+        (0, 0, 2, -1, 8822),
+        (2, -1, 0, -1, 8216),
+        (2, 0, -2, -1, 4324),
+        (2, 0, 1, 1, 4200),
+        (2, 1, 0, -1, -3359),
+        (2, -1, -1, 1, 2463),
+        (2, -1, 0, 1, 2211),
+        (2, -1, -1, -1, 2065),
+        (0, 1, -1, -1, -1870),
+        (4, 0, -1, -1, 1828),
+        (0, 1, 0, 1, -1794),
+        (0, 0, 0, 3, -1749),
+        (0, 1, -1, 1, -1565),
+        (1, 0, 0, 1, -1491),
+        (0, 1, 1, 1, -1475),
+        (0, 1, 1, -1, -1410),
+        (0, 1, 0, -1, -1344),
+        (1, 0, 0, -1, -1335),
+        (0, 0, 3, 1, 1107),
+        (4, 0, 0, -1, 1021),
+        (4, 0, -1, 1, 833),
+        (0, 0, 1, -3, 777),
+        (4, 0, -2, 1, 671),
+        (2, 0, 0, -3, 607),
+        (2, 0, 2, -1, 596),
+        (2, -1, 1, -1, 491),
+        (2, 0, -2, 1, -451),
+        (0, 0, 3, -1, 439),
+        (2, 0, 2, 1, 422),
+        (2, 0, -3, -1, 421),
+        (2, 1, -1, 1, -366),
+        (2, 1, 0, 1, -351),
+        (4, 0, 0, 1, 331),
+        (2, -1, 1, 1, 315),
+        (2, -2, 0, -1, 302),
+        (0, 0, 1, 3, -283),
+        (2, 1, 1, -1, -229),
+        (1, 1, 0, -1, 223),
+        (1, 1, 0, 1, 223),
+        (0, 1, -2, -1, -220),
+        (2, 1, -1, -1, -220),
+        (1, 0, 1, 1, -185),
+        (2, -1, -2, -1, 181),
+        (0, 1, 2, 1, -177),
+        (4, 0, -2, -1, 176),
+        (4, -1, -1, -1, 166),
+        (1, 0, 1, -1, -164),
+        (4, 0, 1, -1, 132),
+        (1, 0, -1, -1, -119),
+        (4, -1, 0, -1, 115),
+        (2, -2, 0, 1, 107),
+    ]
+
+    /// The Moon's geocentric ecliptic LATITUDE (Meeus Table 47.B plus the six
+    /// additive terms), degrees. Verified against the book's Example 47.a
+    /// (JD 2448724.5 TD: beta = -3.229126) in the fixture test. Latitude is
+    /// unaffected by nutation in longitude, so no apparent correction
+    /// applies here.
+    /// Earth-Moon distance in kilometres for a UT Julian date.
+    static func moonDistanceKm(jd: Double) -> Double {
+        moonDistanceKm(jdTT: terrestrialJD(fromUT: jd))
+    }
+
+    /// Meeus Table 47.A distance (Sigma-r) series, taking a TT Julian date.
+    /// Coefficients are in 1e-3 km; Delta = 385000.56 km + Sigma-r * 1e-3.
+    /// Transcribed from two independent open-source lineages (astronomia
+    /// moonposition.js and PyMeeus Moon.py) that agree on all 60 rows, and
+    /// pinned to the book's Example 47.a (368409.7 km). Note the final row
+    /// (2,0,-1,-2) is distance-only (its Sigma-l is zero), so this table is
+    /// carried independently of the longitude series.
+    static func moonDistanceKm(jdTT: Double) -> Double {
+        let jd = jdTT
+        let T = (jd - J2000) / 36525.0
+        let t2 = T * T
+        let t3 = t2 * T
+        let t4 = t3 * T
+        let D = normalize360(
+            297.8501921 + 445267.1114034 * T - 0.0018819 * t2
+                + t3 / 545868.0 - t4 / 113065000.0
+        ) * DEG
+        let M = normalize360(
+            357.5291092 + 35999.0502909 * T - 0.0001536 * t2
+                + t3 / 24490000.0
+        ) * DEG
+        let Mp = normalize360(
+            134.9633964 + 477198.8675055 * T + 0.0087414 * t2
+                + t3 / 69699.0 - t4 / 14712000.0
+        ) * DEG
+        let F = normalize360(
+            93.2720950 + 483202.0175233 * T - 0.0036539 * t2
+                - t3 / 3526000.0 + t4 / 863310000.0
+        ) * DEG
+        let E = 1 - 0.002516 * T - 0.0000074 * t2
+
+        // (D, M, M', F, coefficient in 1e-3 km); zero-coefficient rows of
+        // the book's table are omitted (they carry only longitude terms).
+        let terms: [(d: Int, m: Int, mp: Int, f: Int, coefficient: Double)] = [
+            (0, 0, 1, 0, -20_905_355), (2, 0, -1, 0, -3_699_111),
+            (2, 0, 0, 0, -2_955_968), (0, 0, 2, 0, -569_925),
+            (0, 1, 0, 0, 48_888), (0, 0, 0, 2, -3_149),
+            (2, 0, -2, 0, 246_158), (2, -1, -1, 0, -152_138),
+            (2, 0, 1, 0, -170_733), (2, -1, 0, 0, -204_586),
+            (0, 1, -1, 0, -129_620), (1, 0, 0, 0, 108_743),
+            (0, 1, 1, 0, 104_755), (2, 0, 0, -2, 10_321),
+            (0, 0, 1, -2, 79_661), (4, 0, -1, 0, -34_782),
+            (0, 0, 3, 0, -23_210), (4, 0, -2, 0, -21_636),
+            (2, 1, -1, 0, 24_208), (2, 1, 0, 0, 30_824),
+            (1, 0, -1, 0, -8_379), (1, 1, 0, 0, -16_675),
+            (2, -1, 1, 0, -12_831), (2, 0, 2, 0, -10_445),
+            (4, 0, 0, 0, -11_650), (2, 0, -3, 0, 14_403),
+            (0, 1, -2, 0, -7_003), (2, -1, -2, 0, 10_056),
+            (1, 0, 1, 0, 6_322), (2, -2, 0, 0, -9_884),
+            (0, 1, 2, 0, 5_751), (2, -2, -1, 0, -4_950),
+            (2, 0, 1, -2, 4_130), (4, -1, -1, 0, -3_958),
+            (3, 0, -1, 0, 3_258), (2, 1, 1, 0, 2_616),
+            (4, -1, -2, 0, -1_897), (0, 2, -1, 0, -2_117),
+            (2, 2, -1, 0, 2_354), (4, 0, 1, 0, -1_423),
+            (0, 0, 4, 0, -1_117), (4, -1, 0, 0, -1_571),
+            (1, 0, -2, 0, -1_739), (0, 0, 2, -2, -4_421),
+            (0, 2, 1, 0, 1_165), (2, 0, -1, -2, 8_752),
+        ]
+
+        var sum = 0.0
+        for term in terms {
+            let argument = Double(term.d) * D + Double(term.m) * M
+                + Double(term.mp) * Mp + Double(term.f) * F
+            let scale = term.m == 0 ? 1.0 : pow(E, Double(abs(term.m)))
+            sum += term.coefficient * scale * cos(argument)
+        }
+        return 385_000.56 + sum / 1_000.0
+    }
+
+    /// Ecliptic lunar latitude for a UT Julian date -- converts to TT
+    /// internally, where the Meeus series is defined.
+    static func moonLatitude(jd: Double) -> Double {
+        moonLatitude(jdTT: terrestrialJD(fromUT: jd))
+    }
+
+    /// The series itself, taking a TT Julian date (Meeus worked examples).
+    static func moonLatitude(jdTT: Double) -> Double {
+        let jd = jdTT
+        let T = (jd - J2000) / 36525.0
+        let t2 = T * T
+        let t3 = t2 * T
+        let t4 = t3 * T
+        let LpDegrees = normalize360(
+            218.3164477 + 481267.88123421 * T - 0.0015786 * t2
+                + t3 / 538841.0 - t4 / 65194000.0
+        )
+        let D = normalize360(
+            297.8501921 + 445267.1114034 * T - 0.0018819 * t2
+                + t3 / 545868.0 - t4 / 113065000.0
+        ) * DEG
+        let M = normalize360(
+            357.5291092 + 35999.0502909 * T - 0.0001536 * t2
+                + t3 / 24490000.0
+        ) * DEG
+        let Mp = normalize360(
+            134.9633964 + 477198.8675055 * T + 0.0087414 * t2
+                + t3 / 69699.0 - t4 / 14712000.0
+        ) * DEG
+        let F = normalize360(
+            93.2720950 + 483202.0175233 * T - 0.0036539 * t2
+                - t3 / 3526000.0 + t4 / 863310000.0
+        ) * DEG
+        let e = 1 - 0.002516 * T - 0.0000074 * t2
+
+        var sumB: Double = 0
+        for term in latitudeTerms {
+            let argument = Double(term.d) * D
+                + Double(term.m) * M
+                + Double(term.moonAnomaly) * Mp
+                + Double(term.f) * F
+            let eccentricityScale = pow(e, Double(abs(term.m)))
+            sumB += term.coefficient * eccentricityScale * sin(argument)
+        }
+
+        // Additive terms (Meeus p. 342). No E scaling on these.
+        let a1 = normalize360(119.75 + 131.849 * T) * DEG
+        let a3 = normalize360(313.45 + 481266.484 * T) * DEG
+        let lp = LpDegrees * DEG
+        sumB += -2_235 * sin(lp)
+            + 382 * sin(a3)
+            + 175 * sin(a1 - F)
+            + 175 * sin(a1 + F)
+            + 127 * sin(lp - Mp)
+            - 115 * sin(lp + Mp)
+
+        return sumB / 1_000_000.0
     }
 
     // MARK: - Nakshatra
@@ -207,17 +511,44 @@ enum CosmicEngine {
 
     // MARK: - Panchang
 
-    static func getPanchang(context: CalculationContext) -> Panchang {
-        getPanchang(date: context.localNoon, calendar: context.calendar)
+    static func getPanchang(
+        context: CalculationContext,
+        includeTransitions: Bool = true
+    ) -> Panchang {
+        let solar = getSunriseSunset(context: context)
+        let referenceDate = solar?.sunrise ?? context.localNoon
+        return getPanchang(
+            date: referenceDate,
+            calendar: context.calendar,
+            sunriseTime: solar?.sunrise,
+            sunsetTime: solar?.sunset,
+            transitions: includeTransitions ? getPanchangTransitions(after: referenceDate) : .unavailable
+        )
+    }
+
+    static func panchangReferenceDate(for context: CalculationContext) -> Date {
+        getSunriseSunset(context: context)?.sunrise ?? context.localNoon
     }
 
     static func getPanchang(date: Date, timezoneIdentifier: String = "UTC") -> Panchang {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: timezoneIdentifier) ?? .gmt
-        return getPanchang(date: date, calendar: calendar)
+        return getPanchang(
+            date: date,
+            calendar: calendar,
+            sunriseTime: nil,
+            sunsetTime: nil,
+            transitions: .unavailable
+        )
     }
 
-    private static func getPanchang(date: Date, calendar: Calendar) -> Panchang {
+    private static func getPanchang(
+        date: Date,
+        calendar: Calendar,
+        sunriseTime: Date?,
+        sunsetTime: Date?,
+        transitions: PanchangTransitions
+    ) -> Panchang {
         let jd = julianDateFromDate(date)
         let sunLon  = siderealize(sunLongitude(jd: jd), jd: jd)
         let moonLon = siderealize(moonLongitude(jd: jd), jd: jd)
@@ -228,6 +559,7 @@ enum CosmicEngine {
 
         // Nakshatra of Moon
         let moonNak = getNakshatraPada(moonLon)
+        let sunNakshatraIdx = getNakshatraPada(sunLon).nakshatraIndex
 
         // Yoga: (sun + moon) / (360/27)
         let yogaDeg = normalize360(sunLon + moonLon)
@@ -248,6 +580,7 @@ enum CosmicEngine {
             tithiName: Panchang.tithiNames[tithiIdx.clamped(to: 0...29)],
             nakshatraIndex: moonNak.nakshatraIndex,
             nakshatraName: moonNak.nakshatraName,
+            sunNakshatraIndex: sunNakshatraIdx,
             yogaIndex: yogaIdx,
             yogaName: Panchang.yogaNames[yogaIdx],
             karanaIndex: karanaIdx.clamped(to: 0...10),
@@ -255,8 +588,9 @@ enum CosmicEngine {
             weekdayName: weekdayNames[(weekday - 1).clamped(to: 0...6)],
             moonSignIndex: moonSignIdx,
             moonSignName: ZodiacSign.fromIndex(moonSignIdx).name,
-            sunriseTime: nil,
-            sunsetTime: nil
+            sunriseTime: sunriseTime,
+            sunsetTime: sunsetTime,
+            transitions: transitions
         )
     }
 
@@ -267,20 +601,235 @@ enum CosmicEngine {
         return raw - 50 // 57 Shakuni, 58 Chatushpada, 59 Naga
     }
 
-    // MARK: - Sunrise / Sunset (NOAA / Meeus ch.15)
+    // MARK: - Panchang limb boundaries
 
-    /// Returns sunrise and sunset as UTC hour-of-day (e.g. 6.5 = 06:30 UTC)
+    /// Solves the next boundary of every changing Panchang limb from an exact
+    /// reference instant. Each angle is monotonic over the short search window,
+    /// so a bracketed binary search gives sub-second numerical precision without
+    /// coupling the result to the UI's refresh cadence.
+    static func getPanchangTransitions(after date: Date) -> PanchangTransitions {
+        PanchangTransitions(
+            tithi: nextTransition(for: .tithi, after: date),
+            nakshatra: nextTransition(for: .nakshatra, after: date),
+            yoga: nextTransition(for: .yoga, after: date),
+            karana: nextTransition(for: .karana, after: date)
+        )
+    }
+
+    private struct LimbTransitionState {
+        let angle: Double
+        let segmentSize: Double
+        let currentName: String
+        let nextName: String
+    }
+
+    /// The instant the CURRENT limb value began -- the previous boundary at
+    /// or before `date`, solved by the same bracketed bisection running
+    /// backwards. Nil only if no boundary exists within 72 hours (never for
+    /// real limbs, whose segments are far shorter).
+    private static func previousTransitionTime(
+        for kind: PanchangLimbKind,
+        before date: Date
+    ) -> Date? {
+        let initial = limbTransitionState(for: kind, at: date)
+        let remainder = initial.angle.truncatingRemainder(dividingBy: initial.segmentSize)
+        // At (or within noise of) a boundary the current value began now.
+        if remainder < 1e-10 { return date }
+
+        func elapsedAngle(at candidate: Date) -> Double {
+            let angle = limbTransitionState(for: kind, at: candidate).angle
+            return normalize360(initial.angle - angle)
+        }
+
+        var lower = date.addingTimeInterval(-36 * 3_600)
+        var upper = date
+        while elapsedAngle(at: lower) < remainder,
+              date.timeIntervalSince(lower) < 72 * 3_600 {
+            lower = lower.addingTimeInterval(-12 * 3_600)
+        }
+        guard elapsedAngle(at: lower) >= remainder else { return nil }
+
+        for _ in 0..<56 {
+            let midpoint = lower.addingTimeInterval(upper.timeIntervalSince(lower) / 2)
+            if elapsedAngle(at: midpoint) >= remainder {
+                lower = midpoint
+            } else {
+                upper = midpoint
+            }
+        }
+        return lower.addingTimeInterval(upper.timeIntervalSince(lower) / 2)
+    }
+
+    /// Every window of one limb across the Panchang day: from the value
+    /// already running at the day anchor through the value running at the
+    /// next day anchor. The day is sunrise-anchored (sunrise to next
+    /// sunrise); where sunrise does not exist the local civil day stands in,
+    /// matching the snapshot's disclosed fallback. This is the block a
+    /// published daily panchang prints: starts, ends, kshaya windows that
+    /// never touch a sunrise, and vriddhi values spanning both.
+    static func limbWindows(
+        for kind: PanchangLimbKind,
+        context: CalculationContext
+    ) -> [PanchangLimbWindow] {
+        let anchorStart: Date
+        let anchorEnd: Date
+        if let today = getSunriseSunset(context: context),
+           let tomorrow = getSunriseSunset(context: context.advancedByLocalDays(1)) {
+            anchorStart = today.sunrise
+            anchorEnd = tomorrow.sunrise
+        } else {
+            var cal = context.calendar
+            cal.timeZone = context.timeZone
+            let midnight = cal.startOfDay(for: context.localNoon)
+            guard let next = cal.date(byAdding: .day, value: 1, to: midnight) else { return [] }
+            anchorStart = midnight
+            anchorEnd = next
+        }
+
+        guard var cursor = previousTransitionTime(for: kind, before: anchorStart) else { return [] }
+        var windows: [PanchangLimbWindow] = []
+        // A limb segment is at least ~6.5 h (karana at lunar perigee); 64
+        // iterations is an order of magnitude beyond any real day.
+        for _ in 0..<64 {
+            // Query 30 s past the cursor: the cursor sits on a bisected
+            // boundary, and an epsilon-early solution would otherwise read
+            // as "almost a full segment elapsed" and return an immediate
+            // zero-length duplicate. Real segments are hours long, so the
+            // nudge cannot skip one; it also guarantees the state reports
+            // the NEW value's name.
+            guard let transition = nextTransition(for: kind, after: cursor.addingTimeInterval(30)),
+                  transition.endTime > cursor else { break }
+            windows.append(PanchangLimbWindow(
+                kind: kind,
+                name: transition.currentName,
+                startTime: cursor,
+                endTime: transition.endTime
+            ))
+            cursor = transition.endTime
+            if cursor >= anchorEnd { break }
+        }
+        return windows
+    }
+
+    private static func nextTransition(
+        for kind: PanchangLimbKind,
+        after date: Date
+    ) -> PanchangTransition? {
+        let initial = limbTransitionState(for: kind, at: date)
+        let remainder = initial.angle.truncatingRemainder(dividingBy: initial.segmentSize)
+        let distanceToBoundary = remainder < 1e-10
+            ? initial.segmentSize
+            : initial.segmentSize - remainder
+
+        func accumulatedAngle(at candidate: Date) -> Double {
+            let angle = limbTransitionState(for: kind, at: candidate).angle
+            return normalize360(angle - initial.angle)
+        }
+
+        var lower = date
+        var upper = date.addingTimeInterval(36 * 3_600)
+        while accumulatedAngle(at: upper) < distanceToBoundary,
+              upper.timeIntervalSince(date) < 72 * 3_600 {
+            upper = upper.addingTimeInterval(12 * 3_600)
+        }
+        guard accumulatedAngle(at: upper) >= distanceToBoundary else { return nil }
+
+        for _ in 0..<56 {
+            let midpoint = lower.addingTimeInterval(upper.timeIntervalSince(lower) / 2)
+            if accumulatedAngle(at: midpoint) >= distanceToBoundary {
+                upper = midpoint
+            } else {
+                lower = midpoint
+            }
+        }
+
+        return PanchangTransition(
+            kind: kind,
+            currentName: initial.currentName,
+            nextName: initial.nextName,
+            endTime: lower.addingTimeInterval(upper.timeIntervalSince(lower) / 2)
+        )
+    }
+
+    private static func limbTransitionState(
+        for kind: PanchangLimbKind,
+        at date: Date
+    ) -> LimbTransitionState {
+        let jd = julianDateFromDate(date)
+        let sunSidereal = siderealize(sunLongitude(jd: jd), jd: jd)
+        let moonSidereal = siderealize(moonLongitude(jd: jd), jd: jd)
+        let elongation = normalize360(moonSidereal - sunSidereal)
+
+        let angle: Double
+        let segmentSize: Double
+        let segmentCount: Int
+        switch kind {
+        case .tithi:
+            angle = elongation
+            segmentSize = 12
+            segmentCount = 30
+        case .nakshatra:
+            angle = moonSidereal
+            segmentSize = 360.0 / 27.0
+            segmentCount = 27
+        case .yoga:
+            angle = normalize360(sunSidereal + moonSidereal)
+            segmentSize = 360.0 / 27.0
+            segmentCount = 27
+        case .karana:
+            angle = elongation
+            segmentSize = 6
+            segmentCount = 60
+        }
+
+        let rawIndex = Int(angle / segmentSize).clamped(to: 0...(segmentCount - 1))
+        let nextRawIndex = (rawIndex + 1) % segmentCount
+        let names: (current: String, next: String)
+        switch kind {
+        case .tithi:
+            names = (Panchang.tithiNames[rawIndex], Panchang.tithiNames[nextRawIndex])
+        case .nakshatra:
+            names = (Panchang.nakshatraNames[rawIndex], Panchang.nakshatraNames[nextRawIndex])
+        case .yoga:
+            names = (Panchang.yogaNames[rawIndex], Panchang.yogaNames[nextRawIndex])
+        case .karana:
+            names = (
+                Panchang.karanaNames[karanaIndex(forHalfTithiIndex: rawIndex)],
+                Panchang.karanaNames[karanaIndex(forHalfTithiIndex: nextRawIndex)]
+            )
+        }
+
+        return LimbTransitionState(
+            angle: angle,
+            segmentSize: segmentSize,
+            currentName: names.current,
+            nextName: names.next
+        )
+    }
+
+    // MARK: - Sunrise / Sunset (Meeus ch.15, using the engine's own §25 Sun model)
+
+    /// Returns sunrise and sunset as UTC hour-of-day (e.g. 6.5 = 06:30 UTC).
+    ///
+    /// Declination and right ascension come from `sunLongitude(jd:)` — the
+    /// same full-series apparent longitude (equation of center to the 3rd
+    /// term, Jupiter/Venus perturbations, nutation/aberration) that tithi,
+    /// nakshatra, yoga, and karana are computed from — rather than a
+    /// separately maintained two-term approximation. The two-term version
+    /// and a fixed 23.4393 degree obliquity are each accurate to roughly
+    /// 0.01 degrees only near J2000; using one Sun model everywhere means
+    /// sunrise/sunset can never quietly disagree with the five limbs about
+    /// where the Sun actually is on a given day.
     static func sunriseSunsetUTHours(year: Int, month: Int, day: Int,
                                      latDeg: Double, lonDeg: Double) -> (rise: Double, set: Double)? {
         let jd0 = julianDate(year: year, month: month, day: day, decimalHour: 0)
-        let n   = jd0 - 2451545.0
-        // Mean solar longitude and mean anomaly
-        let L   = normalize360(280.460  + 0.9856474 * n)
-        let gRad = normalize360(357.528 + 0.9856003 * n) * DEG
-        // Ecliptic longitude
-        let eclRad = normalize360(L + 1.915 * sin(gRad) + 0.020 * sin(2 * gRad)) * DEG
+        let T = (jd0 - J2000) / 36525.0
+        let meanLongitude = sunMeanLongitudeDegrees(T: T)
+        // Mean obliquity of the ecliptic (Meeus §22.2), degrees.
+        let obliquityRad = (23.4392911 - 0.0130042 * T - 0.0000001639 * T * T + 0.0000005036 * T * T * T) * DEG
+        let eclRad = sunLongitude(jd: jd0) * DEG
         // Solar declination
-        let sinDec = sin(23.4393 * DEG) * sin(eclRad)
+        let sinDec = sin(obliquityRad) * sin(eclRad)
         let dec    = asin(sinDec)
         // Hour angle for apparent sunrise (−50' = refraction + disc radius)
         let cosH = (sin(-0.8333 * DEG) - sin(latDeg * DEG) * sin(dec)) /
@@ -288,8 +837,8 @@ enum CosmicEngine {
         guard abs(cosH) <= 1 else { return nil }   // polar day/night
         let H = acos(cosH) * RAD                   // degrees
         // Right ascension for equation of time
-        let RA  = normalize360(atan2(cos(23.4393 * DEG) * sin(eclRad), cos(eclRad)) * RAD)
-        let eqT = normalize180(L - RA) * 4.0      // minutes
+        let RA  = normalize360(atan2(cos(obliquityRad) * sin(eclRad), cos(eclRad)) * RAD)
+        let eqT = normalize180(meanLongitude - RA) * 4.0      // minutes
         // Solar transit in UTC hours
         let noon = 12.0 - lonDeg / 15.0 - eqT / 60.0
         return (noon - H / 15.0, noon + H / 15.0)
@@ -358,13 +907,27 @@ enum CosmicEngine {
         let dayDuration   = sunset.timeIntervalSince(sunrise)   / 15.0
         let nightDuration = nextSunrise.timeIntervalSince(sunset) / 15.0
 
+        // Muhurta 8 IS the Abhijit window (same eighth-of-fifteen span), and
+        // the engine already declines to present Abhijit as auspicious on
+        // Wednesday (getAbhijitMuhurta). Showing the identical window as
+        // Excellent in the muhurta list on the same screen contradicted
+        // that rule, so the same weekday convention demotes it here too.
+        let isWednesday = context.localDayComponents.weekday == 4
+
         var results: [Muhurta] = []
         for i in 0..<15 {
             let start = sunrise.addingTimeInterval(Double(i) * dayDuration)
             let end   = start.addingTimeInterval(dayDuration)
             let data  = muhurtaData[i]
-            results.append(Muhurta(id: i + 1, name: data.name, quality: data.quality,
-                                   purpose: data.purpose, startTime: start, endTime: end, isDay: true))
+            let demoted = isWednesday && i == 7
+            results.append(Muhurta(
+                id: i + 1, name: data.name,
+                quality: demoted ? .mixed : data.quality,
+                purpose: demoted
+                    ? data.purpose + " — this is the Abhijit window, which classical daily practice does not observe as auspicious on Wednesday"
+                    : data.purpose,
+                startTime: start, endTime: end, isDay: true
+            ))
         }
         for i in 0..<15 {
             let start = sunset.addingTimeInterval(Double(i) * nightDuration)
@@ -376,15 +939,6 @@ enum CosmicEngine {
         return results
     }
 
-    static func getMuhurtas(date: Date, latDeg: Double, lonDeg: Double) -> [Muhurta] {
-        getMuhurtas(context: CalculationContext(
-            localDay: date,
-            latitude: latDeg,
-            longitude: lonDeg,
-            timeZoneIdentifier: TimeZone.autoupdatingCurrent.identifier
-        ))
-    }
-
     // MARK: - Public Convenience
 
     /// Returns the Moon's sidereal nakshatra and pada for a given date.
@@ -394,31 +948,86 @@ enum CosmicEngine {
     }
 
     static func getMoonNakshatraPada(context: CalculationContext) -> NakshatraResult {
-        getMoonNakshatraPada(date: context.localNoon)
+        getMoonNakshatraPada(date: panchangReferenceDate(for: context))
     }
 
     /// Returns sunrise and sunset as `Date` values for a given day and location.
+    ///
+    /// The solver works in UTC calendar days, but the caller asks about a LOCAL
+    /// civil day. Where the zone offset and the longitude's solar time disagree
+    /// by more than ~12 hours — Apia and Nuku'alofa at UTC+13 with longitudes
+    /// near -172/-175 are selectable examples — the events solved for the
+    /// matching UTC day land on the wrong local day, silently shifting sunrise,
+    /// every muhurta, and the sunrise-anchored five limbs by a full day. So the
+    /// result is checked against the requested local day and re-solved with the
+    /// UTC day shifted when it disagrees, instead of trusting the naive mapping.
     static func getSunriseSunset(context: CalculationContext) -> (sunrise: Date, sunset: Date)? {
         let components = context.localDayComponents
-        guard let y = components.year, let m = components.month, let d = components.day,
-              let ss = sunriseSunsetUTHours(
-                year: y,
-                month: m,
-                day: d,
-                latDeg: context.latitude,
-                lonDeg: context.longitude
-              ) else { return nil }
-        return (dateFromUTCHour(ss.rise, year: y, month: m, day: d),
-                dateFromUTCHour(ss.set, year: y, month: m, day: d))
+        guard let y = components.year, let m = components.month, let d = components.day else {
+            return nil
+        }
+
+        func solve(utcDayOffset: Int) -> (sunrise: Date, sunset: Date)? {
+            var cal = Calendar(identifier: .gregorian)
+            cal.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+            guard let base = cal.date(from: DateComponents(year: y, month: m, day: d, hour: 12)),
+                  let shifted = cal.date(byAdding: .day, value: utcDayOffset, to: base) else {
+                return nil
+            }
+            let sc = cal.dateComponents([.year, .month, .day], from: shifted)
+            guard let sy = sc.year, let sm = sc.month, let sd = sc.day,
+                  let ss = sunriseSunsetUTHours(
+                    year: sy, month: sm, day: sd,
+                    latDeg: context.latitude, lonDeg: context.longitude
+                  ) else { return nil }
+            return (dateFromUTCHour(ss.rise, year: sy, month: sm, day: sd),
+                    dateFromUTCHour(ss.set, year: sy, month: sm, day: sd))
+        }
+
+        guard let naive = solve(utcDayOffset: 0) else { return nil }
+        let calendar = context.calendar
+        let requestedDay = calendar.startOfDay(for: context.localNoon)
+        let solvedDay = calendar.startOfDay(for: naive.sunrise)
+        let dayError = calendar.dateComponents([.day], from: requestedDay, to: solvedDay).day ?? 0
+        guard dayError != 0 else { return naive }
+
+        guard let corrected = solve(utcDayOffset: -dayError),
+              calendar.isDate(corrected.sunrise, inSameDayAs: context.localNoon) else {
+            // A correction that still misses would mean inconsistent inputs;
+            // fail closed rather than return events for the wrong civil day.
+            return nil
+        }
+        return corrected
     }
 
-    static func getSunriseSunset(date: Date, latDeg: Double, lonDeg: Double) -> (sunrise: Date, sunset: Date)? {
-        getSunriseSunset(context: CalculationContext(
-            localDay: date,
-            latitude: latDeg,
-            longitude: lonDeg,
-            timeZoneIdentifier: TimeZone.autoupdatingCurrent.identifier
-        ))
+    // MARK: - Sunrise-based daily observances
+
+    /// Brahma Muhurta is the traditional 48-minute muhurta beginning two
+    /// muhurtas before sunrise and ending one muhurta before sunrise.
+    static func getBrahmaMuhurta(context: CalculationContext) -> (start: Date, end: Date)? {
+        guard let sunrise = getSunriseSunset(context: context)?.sunrise else { return nil }
+        return (
+            start: sunrise.addingTimeInterval(-96 * 60),
+            end: sunrise.addingTimeInterval(-48 * 60)
+        )
+    }
+
+    /// Abhijit is the eighth of fifteen daylight muhurtas, centered on local
+    /// apparent noon. It scales with daylight rather than assuming a fixed
+    /// 48-minute clock interval. Classical daily Panchang practice does not
+    /// present it as an auspicious window on Wednesday.
+    static func getAbhijitMuhurta(context: CalculationContext) -> (start: Date, end: Date)? {
+        guard context.localDayComponents.weekday != 4,
+              let solar = getSunriseSunset(context: context) else {
+            return nil
+        }
+        let daylight = solar.sunset.timeIntervalSince(solar.sunrise)
+        let muhurtaLength = daylight / 15.0
+        let solarNoon = solar.sunrise.addingTimeInterval(daylight / 2.0)
+        return (
+            start: solarNoon.addingTimeInterval(-muhurtaLength / 2.0),
+            end: solarNoon.addingTimeInterval(muhurtaLength / 2.0)
+        )
     }
 
     // MARK: - Choghadiya (Vedic day-segments)
@@ -460,6 +1069,12 @@ enum CosmicEngine {
         return out
     }
 
+    /// QUARANTINED-ONLY legacy overload: silently binds the DEVICE time zone
+    /// to explicit coordinates, violating the calculation contract every
+    /// shipping path follows. Its sole caller is the quarantined
+    /// getVedicCalendarInfo prototype; marked unavailable to shipping code so
+    /// a new call site cannot compile against it by accident.
+    @available(*, deprecated, message: "Device-timezone overload; use getChoghadiya(context:) with an explicit IANA zone")
     static func getChoghadiya(date: Date, latDeg: Double, lonDeg: Double) -> [Choghadiya] {
         getChoghadiya(context: CalculationContext(
             localDay: date,
@@ -508,17 +1123,11 @@ enum CosmicEngine {
         return out
     }
 
-    static func getHora(date: Date, latDeg: Double, lonDeg: Double) -> [Hora] {
-        getHora(context: CalculationContext(
-            localDay: date,
-            latitude: latDeg,
-            longitude: lonDeg,
-            timeZoneIdentifier: TimeZone.autoupdatingCurrent.identifier
-        ))
-    }
+    // MARK: - Moonrise / Moonset prototype (not surfaced)
 
-    // MARK: - Moonrise / Moonset (approximate; Meeus §15 adapted)
-
+    /// Experimental approximation retained for research only. It is not
+    /// topocentric and must not be wired into a shipping surface without the
+    /// validation work listed in ACCURACY.md.
     static func getMoonriseMoonset(date: Date, latDeg: Double, lonDeg: Double) -> (moonrise: Date?, moonset: Date?) {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
@@ -552,130 +1161,102 @@ enum CosmicEngine {
     }
 
     static func getSunNakshatra(context: CalculationContext) -> NakshatraResult {
-        getSunNakshatra(date: context.localNoon)
+        getSunNakshatra(date: panchangReferenceDate(for: context))
     }
 
-    // MARK: - Tithi End Time (binary search to next 12° elongation boundary)
+    // MARK: - Tithi End Time
 
     static func getTithiEndTime(date: Date) -> Date? {
-        let jd0 = julianDateFromDate(date)
-
-        func elongRaw(_ jd: Double) -> Double {
-            let sL = siderealize(sunLongitude(jd: jd), jd: jd)
-            let mL = siderealize(moonLongitude(jd: jd), jd: jd)
-            return normalize360(mL - sL)
-        }
-
-        let e0 = elongRaw(jd0)
-        let degsToNext = 12.0 - e0.truncatingRemainder(dividingBy: 12.0)
-
-        // Monotonically increasing accumulated elongation since jd0
-        func accumulated(_ jd: Double) -> Double {
-            let e = elongRaw(jd)
-            return e < e0 - 180 ? e + 360 - e0 : e - e0
-        }
-
-        var lo = jd0, hi = jd0 + 2.0
-        guard accumulated(hi) >= degsToNext else { return nil }
-
-        for _ in 0..<52 {
-            let mid = (lo + hi) / 2.0
-            if accumulated(mid) >= degsToNext { hi = mid } else { lo = mid }
-        }
-        return date.addingTimeInterval(((lo + hi) / 2.0 - jd0) * 86400.0)
+        nextTransition(for: .tithi, after: date)?.endTime
     }
 
     static func getTithiEndTime(context: CalculationContext) -> Date? {
-        getTithiEndTime(date: context.localNoon)
+        nextTransition(for: .tithi, after: panchangReferenceDate(for: context))?.endTime
     }
 
-    // MARK: - Chandra Bala & Tara Bala
 
-    struct TaraBalaResult {
-        let position: Int           // 1–27 from birth nakshatra
-        let taraNumber: Int         // 1–9
-        let taraName: String
-        let taraQuality: String     // "Auspicious" / "Inauspicious" / "Variable"
-        let chandraBalaStrong: Bool  // strong Chandra Bala?
-        let chandraBalaScore: String // "Strong" / "Weak"
+    // MARK: - Sunrise-based inauspicious kalas
+
+    /// Rahu Kala, Yamaganda, and Gulika Kala are weekday-specific selections
+    /// from eight equal daylight divisions. Keeping the tables in the engine
+    /// prevents presentation code from inventing clock-time fallbacks.
+    static func getRahuKala(context: CalculationContext) -> (start: Date, end: Date)? {
+        let slots = [8, 2, 7, 5, 6, 4, 3] // Sunday through Saturday
+        return daylightKala(context: context, slotsByWeekday: slots)
     }
 
-    static func getTaraBala(currentNakshatraIdx: Int, birthNakshatraIdx: Int) -> TaraBalaResult {
-        let pos = ((currentNakshatraIdx - birthNakshatraIdx + 27) % 27) + 1
-
-        // Chandra Bala: strong at positions 1, 3, 6, 7, 10, 11 (from birth nakshatra)
-        let strongPositions: Set<Int> = [1, 3, 6, 7, 10, 11]
-        let isStrong = strongPositions.contains(pos)
-
-        // Tara: group positions into 9 taras of 3 nakshatras each
-        let taraNum = ((pos - 1) % 9) + 1
-        let taraNames = ["Janma", "Sampat", "Vipat", "Kshema", "Pratyak", "Sadhana", "Nidhan", "Mitra", "Parama Mitra"]
-        let taraQualities = ["Variable", "Auspicious", "Inauspicious", "Auspicious", "Inauspicious",
-                             "Auspicious", "Inauspicious", "Auspicious", "Most Auspicious"]
-        return TaraBalaResult(
-            position: pos,
-            taraNumber: taraNum,
-            taraName: taraNames[taraNum - 1],
-            taraQuality: taraQualities[taraNum - 1],
-            chandraBalaStrong: isStrong,
-            chandraBalaScore: isStrong ? "Strong" : "Weak"
-        )
+    static func getYamaganda(context: CalculationContext) -> (start: Date, end: Date)? {
+        let slots = [5, 4, 3, 2, 1, 7, 6] // Sunday through Saturday
+        return daylightKala(context: context, slotsByWeekday: slots)
     }
 
-    // MARK: - Gulika Kala slot (1-based, within 8 equal day divisions)
+    static func getGulikaKala(context: CalculationContext) -> (start: Date, end: Date)? {
+        let slots = [7, 6, 5, 4, 3, 2, 1] // Sunday through Saturday
+        return daylightKala(context: context, slotsByWeekday: slots)
+    }
 
-    static func gulikaSlot(weekday: String) -> Int {
-        switch weekday {
-        case "Sunday":    return 7
-        case "Monday":    return 6
-        case "Tuesday":   return 5
-        case "Wednesday": return 4
-        case "Thursday":  return 3
-        case "Friday":    return 2
-        case "Saturday":  return 1
-        default:          return 1
+    private static func daylightKala(
+        context: CalculationContext,
+        slotsByWeekday: [Int]
+    ) -> (start: Date, end: Date)? {
+        guard slotsByWeekday.count == 7,
+              let weekday = context.localDayComponents.weekday,
+              (1...7).contains(weekday),
+              let solar = getSunriseSunset(context: context) else {
+            return nil
         }
+        let slotLength = solar.sunset.timeIntervalSince(solar.sunrise) / 8.0
+        let slot = slotsByWeekday[weekday - 1]
+        let start = solar.sunrise.addingTimeInterval(Double(slot - 1) * slotLength)
+        return (start: start, end: start.addingTimeInterval(slotLength))
     }
 
-    /// Returns the 1-2 classically inauspicious Dur Muhurta windows for the given date.
-    /// Indices are 0-based into the 15 day muhurtas; table from Muhurta Chintamani.
+    /// Returns the classically inauspicious Dur Muhurta windows for the Vedic day.
+    /// Indices are zero-based within the 15 daylight or 15 night divisions.
+    /// Tuesday's second period is a night division; treating every weekday entry
+    /// as a daylight slot produces a plausible but materially wrong result.
     static func getDurMuhurta(context: CalculationContext) -> [(start: Date, end: Date, label: String)] {
-        guard let ss = getSunriseSunset(context: context) else { return [] }
-        let dayDuration = ss.sunset.timeIntervalSince(ss.sunrise)
-        let slotLen = dayDuration / 15.0
+        guard let today = getSunriseSunset(context: context),
+              let tomorrow = getSunriseSunset(context: context.advancedByLocalDays(1)) else {
+            return []
+        }
+        let daySlotLength = today.sunset.timeIntervalSince(today.sunrise) / 15.0
+        let nightSlotLength = tomorrow.sunrise.timeIntervalSince(today.sunset) / 15.0
 
         // Weekday from Calendar (1=Sun…7=Sat)
         let wd = context.localDayComponents.weekday ?? 1
-        let slots: [Int]
+        let daySlots: [Int]
+        let nightSlots: [Int]
         switch wd {
-        case 1: slots = [3, 8]    // Sunday:    4th (Vidha) + 9th (Kutupa)
-        case 2: slots = [6, 14]   // Monday:    7th + 15th
-        case 3: slots = [0, 7]    // Tuesday:   1st + 8th
-        case 4: slots = [3]       // Wednesday: 4th (Rohita)
-        case 5: slots = [5, 9]    // Thursday:  6th + 10th
-        case 6: slots = [2, 7]    // Friday:    3rd + 8th
-        case 7: slots = [2, 9]    // Saturday:  3rd + 10th
-        default: slots = []
+        case 1: (daySlots, nightSlots) = ([13], [])
+        case 2: (daySlots, nightSlots) = ([8, 11], [])
+        case 3: (daySlots, nightSlots) = ([3], [6])
+        case 4: (daySlots, nightSlots) = ([7], [])
+        case 5: (daySlots, nightSlots) = ([5, 11], [])
+        case 6: (daySlots, nightSlots) = ([3, 8], [])
+        case 7: (daySlots, nightSlots) = ([0, 1], [])
+        default: (daySlots, nightSlots) = ([], [])
         }
 
-        let labels = slots.enumerated().map { i, _ in i == 0 ? "1st" : "2nd" }
-        return zip(slots, labels).map { (idx, lbl) in
-            let start = ss.sunrise.addingTimeInterval(Double(idx) * slotLen)
-            let end   = start.addingTimeInterval(slotLen)
-            return (start: start, end: end, label: lbl)
+        var periods = daySlots.map { index in
+            let start = today.sunrise.addingTimeInterval(Double(index) * daySlotLength)
+            return (start: start, end: start.addingTimeInterval(daySlotLength), label: "")
+        }
+        periods += nightSlots.map { index in
+            let start = today.sunset.addingTimeInterval(Double(index) * nightSlotLength)
+            return (start: start, end: start.addingTimeInterval(nightSlotLength), label: "")
+        }
+        periods.sort { $0.start < $1.start }
+        return periods.enumerated().map { index, period in
+            (
+                start: period.start,
+                end: period.end,
+                label: periods.count == 1 ? "Dur Muhurta" : (index == 0 ? "1st" : "2nd")
+            )
         }
     }
 
-    static func getDurMuhurta(date: Date, latDeg: Double, lonDeg: Double) -> [(start: Date, end: Date, label: String)] {
-        getDurMuhurta(context: CalculationContext(
-            localDay: date,
-            latitude: latDeg,
-            longitude: lonDeg,
-            timeZoneIdentifier: TimeZone.autoupdatingCurrent.identifier
-        ))
-    }
-
-    // MARK: - Vedic Calendar Extended Info
+    // MARK: - Vedic Calendar Extended Info prototype (not surfaced)
 
     static func getVedicCalendarInfo(date: Date, latDeg: Double, lonDeg: Double,
                                      birthNakshatraIndex: Int = -1) -> VedicCalendarInfo {
@@ -763,7 +1344,7 @@ enum CosmicEngine {
         )
     }
 
-    // MARK: - Nine Graha Positions (Schlyter low-precision algorithm)
+    // MARK: - Nine Graha Positions prototype (not surfaced; low precision)
 
     private enum PlanetID { case mercury, venus, mars, jupiter, saturn }
 
@@ -894,7 +1475,7 @@ enum CosmicEngine {
         return normalized > 180 ? normalized - 360 : normalized
     }
 
-    private static func siderealize(_ tropical: Double, jd: Double) -> Double {
+    static func siderealize(_ tropical: Double, jd: Double) -> Double {
         let year = 2000.0 + (jd - J2000) / 365.25
         return normalize360(tropical - lahiriAyanamsha(year: year))
     }

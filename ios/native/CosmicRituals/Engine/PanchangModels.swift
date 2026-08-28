@@ -58,6 +58,69 @@ struct ZodiacSign: Equatable {
     static func fromIndex(_ i: Int) -> ZodiacSign { all[((i % 12) + 12) % 12] }
 }
 
+// MARK: - Panchang Transitions
+
+enum PanchangLimbKind: String, CaseIterable, Codable, Sendable {
+    case tithi
+    case nakshatra
+    case yoga
+    case karana
+}
+
+/// The next exact boundary for one changing Panchang limb.
+///
+/// Daily labels alone are incomplete because a limb can change at any instant
+/// between one sunrise and the next. Keeping the current and next names beside
+/// the solved boundary makes the value self-describing for the app, exports,
+/// widgets, and accessibility output.
+struct PanchangTransition: Codable, Equatable, Sendable {
+    let kind: PanchangLimbKind
+    let currentName: String
+    let nextName: String
+    let endTime: Date
+}
+
+/// One continuous span of a single limb value (a tithi, nakshatra, yoga, or
+/// karana window) inside a Panchang day. The first window of a day normally
+/// STARTS before sunrise (the limb was already running); a window that both
+/// starts and ends strictly inside the day is the classical kshaya case for
+/// tithis, and a day with a single window spanning both sunrises is vriddhi.
+struct PanchangLimbWindow: Codable, Equatable, Sendable {
+    let kind: PanchangLimbKind
+    let name: String
+    let startTime: Date
+    let endTime: Date
+}
+
+struct PanchangTransitions: Codable, Equatable, Sendable {
+    let tithi: PanchangTransition?
+    let nakshatra: PanchangTransition?
+    let yoga: PanchangTransition?
+    let karana: PanchangTransition?
+
+    static let unavailable = PanchangTransitions(
+        tithi: nil,
+        nakshatra: nil,
+        yoga: nil,
+        karana: nil
+    )
+
+    var chronological: [PanchangTransition] {
+        [tithi, nakshatra, yoga, karana]
+            .compactMap { $0 }
+            .sorted { $0.endTime < $1.endTime }
+    }
+
+    func transition(for kind: PanchangLimbKind) -> PanchangTransition? {
+        switch kind {
+        case .tithi: return tithi
+        case .nakshatra: return nakshatra
+        case .yoga: return yoga
+        case .karana: return karana
+        }
+    }
+}
+
 // MARK: - Panchang (Five Limbs of the Vedic Day)
 
 struct Panchang: Codable {
@@ -66,6 +129,9 @@ struct Panchang: Codable {
     let tithiName: String
     let nakshatraIndex: Int
     let nakshatraName: String
+    /// The Sun's own sidereal nakshatra, distinct from `nakshatraIndex` (the
+    /// Moon's), needed for Ravi Yoga's Sun-to-Moon nakshatra count.
+    let sunNakshatraIndex: Int
     let yogaIndex: Int
     let yogaName: String
     let karanaIndex: Int
@@ -75,6 +141,7 @@ struct Panchang: Codable {
     let moonSignName: String
     let sunriseTime: Date?
     let sunsetTime: Date?
+    let transitions: PanchangTransitions
 
     static let tithiNames = [
         "Pratipada","Dvitiya","Tritiya","Chaturthi","Panchami",
@@ -104,6 +171,13 @@ struct Panchang: Codable {
         "Bava","Balava","Kaulava","Taitila","Garija","Vanija","Vishti",
         "Shakuni","Chatushpada","Naga","Kimstughna"
     ]
+
+    func referenceDisclosure(in timeZone: TimeZone) -> String {
+        if let sunriseTime {
+            return "Panchang day begins at sunrise · \(sunriseTime.ritualShortTime(in: timeZone)) local time"
+        }
+        return "Sunrise unavailable · sampled at \(date.ritualShortTime(in: timeZone)) local time"
+    }
 }
 
 // MARK: - Nakshatra Result
@@ -155,6 +229,29 @@ enum MuhurtaQuality: String {
         case .mixed:        return "◐"
         case .inauspicious: return "✕"
         }
+    }
+}
+
+enum TithiMoonPhase {
+    /// SF Symbol name for a tithi index 0...29. The lunar phase is a direct
+    /// function of the tithi (each tithi is 12 degrees of elongation), so the
+    /// glyph must track it: Amavasya (29) is the new moon, Purnima (14) the
+    /// full moon, with the six intermediate symbols at their eighths. A
+    /// hard-coded waning crescent previously rendered for every tithi.
+    static func symbolName(tithiIndex: Int) -> String {
+        let symbols = [
+            "moonphase.new.moon",
+            "moonphase.waxing.crescent",
+            "moonphase.first.quarter",
+            "moonphase.waxing.gibbous",
+            "moonphase.full.moon",
+            "moonphase.waning.gibbous",
+            "moonphase.last.quarter",
+            "moonphase.waning.crescent",
+        ]
+        let index = ((tithiIndex % 30) + 30) % 30
+        let eighth = Int(((Double(index) + 0.5) / 30.0 * 8.0).rounded()) % 8
+        return symbols[eighth]
     }
 }
 

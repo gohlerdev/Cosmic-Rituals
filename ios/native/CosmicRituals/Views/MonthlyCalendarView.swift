@@ -70,6 +70,8 @@ struct MonthlyCalendarView: View {
                         .foregroundStyle(theme.primary)
                         .frame(width: 44, height: 44)
                 }
+                .accessibilityLabel("Previous month")
+                .accessibilityHint("Shows the previous month's sunrise snapshots")
 
                 Spacer()
 
@@ -79,6 +81,8 @@ struct MonthlyCalendarView: View {
                     Text(displayMonth.ritualDate(template: "y", in: calculationContext.timeZone))
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
 
                 Spacer()
 
@@ -90,6 +94,8 @@ struct MonthlyCalendarView: View {
                         .foregroundStyle(theme.primary)
                         .frame(width: 44, height: 44)
                 }
+                .accessibilityLabel("Next month")
+                .accessibilityHint("Shows the next month's sunrise snapshots")
             }
         }
         .padding(.horizontal)
@@ -136,11 +142,10 @@ struct MonthlyCalendarView: View {
     private var legendCard: some View {
         CosmicGlassCard {
             VStack(alignment: .leading, spacing: 8) {
-                CosmicSectionHeader(title: "Quality Legend", icon: "circle.grid.2x2.fill")
+                CosmicSectionHeader(title: "Sunrise Snapshot Legend", icon: "circle.grid.2x2.fill")
                 HStack(spacing: 16) {
-                    legendItem(.green,  "Auspicious yoga")
-                    legendItem(.red,    "Inauspicious yoga")
-                    legendItem(.orange, "Mixed")
+                    legendItem(.green,  "Favourable yoga")
+                    legendItem(.red,    "Caution yoga")
                 }
                 HStack(spacing: 16) {
                     legendItem(.purple, "Purnima / Ekadashi")
@@ -187,7 +192,9 @@ struct MonthlyCalendarView: View {
                 longitude: calculationContext.longitude,
                 timeZoneIdentifier: calculationContext.timeZoneIdentifier
             )
-            cache[key] = CosmicEngine.getPanchang(context: context)
+            // Month cells need the sunrise snapshot, not four sub-second boundary
+            // solves per day. Detailed transitions are computed only on the daily view.
+            cache[key] = CosmicEngine.getPanchang(context: context, includeTransitions: false)
         }
         panchangCache = cache
     }
@@ -242,15 +249,20 @@ private struct DayCell: View {
                     .fill(qualityColor)
                     .frame(width: 5, height: 5)
             }
-            .frame(height: 60)
+            .frame(maxWidth: .infinity, minHeight: 60)
             .background(
                 isSelected ? theme.primary.opacity(0.12) : Color.clear,
                 in: RoundedRectangle(cornerRadius: 8)
             )
+            .contentShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(date.ritualCompleteDate(in: calendar.timeZone))
-        .accessibilityValue("\(panchang?.tithiName ?? "Panchang unavailable"), \(yogaDetail.isAuspicious ? "auspicious" : "caution")")
+        .accessibilityLabel(isToday
+                            ? "Today, \(date.ritualCompleteDate(in: calendar.timeZone))"
+                            : date.ritualCompleteDate(in: calendar.timeZone))
+        .accessibilityValue("At sunrise, \(panchang?.tithiName ?? "Panchang unavailable"), \(yogaDetail.isAuspicious ? "favourable yoga" : "caution yoga")")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityHint("Selects this date for every Panchang calculation")
     }
 
     private func shortTithi(_ idx: Int) -> String {

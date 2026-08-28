@@ -2,6 +2,10 @@ import Foundation
 
 // MARK: - Festival (lunisolar keyed)
 //
+// PROTOTYPE — deliberately not routed into the shipping UI. The month estimator
+// below does not yet implement Adhika/Kshaya months or observance precedence.
+// See ACCURACY.md before extending or surfacing this file.
+//
 // Festivals are keyed to (lunarMonth, tithiIndex) where:
 //   lunarMonth: 1=Chaitra, 2=Vaishakha, 3=Jyeshtha, 4=Ashadha,
 //               5=Shravana, 6=Bhadrapada, 7=Ashvin, 8=Kartika,
