@@ -4,6 +4,7 @@ struct PanchangView: View {
     @State private var selectedDate = Date()
     @State private var knownToday = Date()
     @State private var lunarInfo: LunarMonthInfo?
+    @State private var regionalMonths: [RegionalSolarMonth] = []
     @Environment(\.scenePhase) private var scenePhase
     @State private var dayBundle: DailyPanchangBundle?
     @State private var detailMuhurta: Muhurta?
@@ -181,10 +182,17 @@ struct PanchangView: View {
         .task(id: calculationContext) {
             let context = calculationContext
             lunarInfo = nil
+            regionalMonths = []
             let info = await Task.detached(priority: .utility) {
                 LunarCalendarEngine.monthInfo(context: context)
             }.value
             if context == calculationContext { lunarInfo = info }
+            let regional = await Task.detached(priority: .utility) {
+                RegionalSolarRule.allCases.compactMap {
+                    RegionalSolarCalendarEngine.solarMonth(context: context, rule: $0)
+                }
+            }.value
+            if context == calculationContext { regionalMonths = regional }
         }
         .task(id: calculationContext) {
             let context = calculationContext
@@ -864,6 +872,39 @@ struct PanchangView: View {
                     Text("Years increment at Chaitra Shukla Pratipada (North-Indian anchor; Gujarat's Kartika-anchored Vikram variant differs). Ayana follows the sidereal Sun, the Makar-Sankranti tradition; the solstice-based reckoning differs.")
                         .font(.caption2).foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    if !regionalMonths.isEmpty {
+                        Divider()
+                        Text("REGIONAL SOLAR MONTHS")
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundStyle(.tertiary)
+                        ForEach(regionalMonths, id: \.rule) { month in
+                            HStack(spacing: 8) {
+                                Text(month.rule.regionTitle)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 84, alignment: .leading)
+                                Text("\(month.monthName) \(month.dayOfMonth)")
+                                    .font(.caption.bold().monospacedDigit())
+                                if let era = month.eraYear, let name = month.eraName {
+                                    Text("· \(name) \(String(era))")
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if month.isBengalBoundaryCase || month.isWithinSolverMarginOfBoundary {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(.orange)
+                                        .accessibilityLabel("Boundary case: this month start is uncertain")
+                                }
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                        Text("Each region names its solar month by its own day rule (Dershowitz-Reingold formalization): Odisha any-time, Tamil sunset, Kerala three-fifths of daylight, Bengal next civil day. Bangladesh's reformed fixed calendar is a different construction and is not computed. A warning marks a start within the solver's ±60-minute envelope of a rule boundary, or Bengal's unpublished midnight special zone.")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 } else {
                     Text("Computing the lunisolar month…")
                         .font(.caption).foregroundStyle(.secondary)

@@ -89,6 +89,40 @@ Both decisions carry negative controls. Reimplementing prahars as fixed
 three-hour blocks turns four tests red, and switching dinamana to the
 proportional 30-ghati reading turns two red.
 
+## Regional solar months (Tamil, Kerala, Bengal, Odisha)
+
+`RegionalSolarCalendarEngine` names the solar month each region actually uses,
+from the same sankranti solver as the lunisolar calendar. The four day-1 rules
+follow Dershowitz & Reingold's formalization ("Indian Calendrical
+Calculations", eqs. 25-28), read from the paper itself:
+
+| Region | Critical moment | 2026 new-year fixture |
+|---|---|---|
+| Odisha (any-time rule) | next sunrise — the sunrise-to-sunrise day containing the sankranti | Baisakha 1 = 14 April (Pana Sankranti) |
+| Tamil Nadu | sunset of the current day | Chithirai 1 = 14 April (Puthandu) |
+| Kerala | sunrise + 3/5 of daylight | Chingam 1 = 17 August, Kollam 1202 |
+| Bengal | next civil midnight | Boishakh 1 = 15 April, San 1433 |
+
+Era years ship only where verified: Kollam (CE − 824 from Chingam, − 825
+before) and the Bengali San (CE − 593 from Boishakh, − 594 before). The Tamil
+sixty-year name cycle and Odisha's anka regnal year are not implemented.
+
+**Three disclosed limits.** (1) Bengal's 23:36–00:24 temporal-time special
+zone has month- and weekday-dependent sub-rules the consulted source does not
+publish; a sankranti inside that window (apparent midnight ± 24 temporal
+minutes) is flagged, never silently resolved. (2) Bangladesh's reformed civil
+calendar pins Pohela Boishakh to 14 April by fixed month lengths — a different
+construction from the astronomical rule computed here, which matches the West
+Bengal traditional 15 April 2026. (3) Day-1 determination inherits the
+sankranti solver's ±60-minute envelope, so any month start whose sankranti
+lies within that margin of the rule's critical moment carries a visible
+uncertainty flag. Kerala's historically distinct critical longitude is noted;
+every reckoning here runs from the single disclosed Lahiri chokepoint.
+
+Negative controls: collapsing the Tamil rule into the any-time rule, moving
+Bengal's start to the sankranti's own day, and flattening the Kollam offset
+each turn dedicated tests red.
+
 ## Vara-Nakshatra combination yogas
 
 `PanchangYogaEngine` cross-references the weekday and the already-computed
