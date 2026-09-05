@@ -460,6 +460,7 @@ struct PanchangView: View {
                 personalStarsCard(for: p)
 
                 lunarCalendarCard
+                siderealSchoolCard
 
                 dayTimelineCard
 
@@ -823,6 +824,55 @@ struct PanchangView: View {
             MuhurtaSummaryPill(label: "★ Auspicious",  spokenLabel: "auspicious",  count: auspicious,   color: .green)
             MuhurtaSummaryPill(label: "◐ Mixed",       spokenLabel: "mixed",       count: mixed,        color: .orange)
             MuhurtaSummaryPill(label: "✕ Avoid",       spokenLabel: "to avoid",    count: inauspicious, color: .red)
+        }
+    }
+
+    /// Which ayanamsha the day is measured from, and what changes if you
+    /// pick another. Shown only when the schools actually disagree about the
+    /// Moon's nakshatra or pada -- on a day they agree, three identical rows
+    /// would imply a choice that makes no difference today.
+    @ViewBuilder
+    private var siderealSchoolCard: some View {
+        let readings = SiderealSchoolComparison.readings(context: calculationContext)
+        let nakshatraSplit = Set(readings.map(\.moonNakshatraIndex)).count > 1
+        let padaSplit = Set(readings.map(\.moonPada)).count > 1
+        if !readings.isEmpty, nakshatraSplit || padaSplit {
+            CosmicGlassCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    CosmicSectionHeader(title: "Sidereal Schools Differ Today", icon: "arrow.triangle.branch")
+                    Text(nakshatraSplit
+                         ? "The three schools place the Moon in DIFFERENT NAKSHATRAS today, so every nakshatra-derived window below moves with the school."
+                         : "The schools agree on the nakshatra but not the pada today.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    ForEach(readings) { reading in
+                        HStack(spacing: 8) {
+                            Text(reading.school.title)
+                                .font(.caption2)
+                                .foregroundStyle(reading.school == AyanamshaSchool.default ? theme.primary : .secondary)
+                                .frame(width: 132, alignment: .leading)
+                            Text("\(reading.moonNakshatraName) \(reading.moonPada)")
+                                .font(.caption.bold().monospacedDigit())
+                            Spacer()
+                            Text(reading.school == AyanamshaSchool.default
+                                 ? "in use"
+                                 : String(format: "%+.1f′", reading.school.offsetArcminutes))
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.tertiary)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+
+                    Text("This app computes Lahiri, and specifically the NOVA/Hand variant — the Calendar Reform Committee anchoring is a different Lahiri. Raman and Krishnamurti are shown as published constant offsets from it (Swiss Ephemeris sweph.h, same J1900 epoch and precession family). Every other value on this screen is Lahiri.")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("panchang.ayanamsha.disclosure")
+                }
+            }
+            .padding(.horizontal)
         }
     }
 

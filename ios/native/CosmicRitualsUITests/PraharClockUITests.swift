@@ -34,10 +34,26 @@ final class PraharClockUITests: XCTestCase {
         requireExistence(praharTab, "the Prahar segment must be reachable from the time-divisions screen")
         praharTab.tap()
 
-        // The Ishta Kaal card and its unit labels.
+        // The Ishta Kaal card always renders. Its LIVE counter renders only
+        // while the day on screen is the running Vedic day -- before today's
+        // sunrise, "today" has not begun and the app deliberately shows the
+        // anchor instead of a running count. This test ran green at 18:27
+        // and red at 04:51 for exactly that reason, so it now asserts the
+        // correct behaviour in BOTH states rather than assuming daylight.
         requireExistence(app.staticTexts["ISHTA KAAL"], "the Ishta Kaal card must render")
-        for unit in ["ghati", "pala", "vipala"] {
-            XCTAssertTrue(app.staticTexts[unit].waitForExistence(timeout: 5), "missing unit label: \(unit)")
+
+        let liveCounter = app.staticTexts["ghati"].waitForExistence(timeout: 5)
+        if liveCounter {
+            for unit in ["pala", "vipala"] {
+                XCTAssertTrue(app.staticTexts[unit].waitForExistence(timeout: 5),
+                              "a live counter must show every unit, missing: \(unit)")
+            }
+        } else {
+            let notLive = app.staticTexts.containing(
+                NSPredicate(format: "label CONTAINS[c] %@", "the live count runs only")
+            ).firstMatch
+            XCTAssertTrue(notLive.waitForExistence(timeout: 5),
+                          "with no live counter the card must say why, not render a blank reading")
         }
 
         // All eight prahars, by name, in both halves of the day.

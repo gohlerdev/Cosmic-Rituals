@@ -132,6 +132,44 @@ Negative controls: collapsing the Tamil rule into the any-time rule, moving
 Bengal's start to the sankranti's own day, and flattening the Kollam offset
 each turn dedicated tests red.
 
+## Sidereal schools: which Lahiri, and what the alternatives change
+
+**Which Lahiri this app computes, stated at last.** "Lahiri" is not one
+number. The Swiss Ephemeris source (`sweph.h`, `ayanamsa[]`) documents two
+definitions in a single comment: the NOVA / Robert Hand anchoring
+{J1900, 360 − 337.53953} = 22.460470°, and the Calendar Reform Committee /
+Indian Astronomical Ephemeris anchoring {2435553.5, 23.250182778 − 0.004658035}.
+This app implements the NOVA variant: its polynomial run back one Julian
+century gives 22.460204° at J1900, agreeing with the NOVA value to **0.96
+arcseconds**. A reader comparing against a CRC-based almanac is comparing
+against a different Lahiri, and the app now says so on screen.
+
+**The alternatives are exact constant offsets, not a second ephemeris.** Every
+school below sits at the same J1900 epoch in the same Swiss Ephemeris table
+under the same Newcomb-family precession, so the precession model cancels out
+of the difference:
+
+| School | Swiss Ephemeris row | Offset from Lahiri |
+|---|---|---|
+| Lahiri (NOVA) | {J1900, 360 − 337.53953} | 0 (the default) |
+| Raman | {J1900, 360 − 338.98556} | −1.446030° (−86.76′) |
+| Krishnamurti (KP) | {J1900, 360 − 337.636111} | −0.096581° (−5.79′) |
+
+Both corroborate independently published comparisons (Raman ≈ 1.45° below
+Lahiri; KP ≈ 6 arcminutes below). Fagan/Bradley is deliberately absent: it is
+Western sidereal at a different epoch under a different precession model, and
+is not a panchang school.
+
+**Lahiri remains the default, and every published fixture depends on that.**
+The two-argument `siderealize` is Lahiri by definition, so no existing call
+site or fixture changes meaning; a test fails if the default moves. The
+Panchang shows a school-comparison card ONLY on days the schools actually
+disagree about the Moon's nakshatra or pada — on a day they agree, three
+identical rows would imply a choice that makes no difference.
+
+Negative controls: zeroing the offsets, flipping the default to KP, and giving
+one school its own precession rate each turn dedicated tests red.
+
 ## Vara-Nakshatra combination yogas
 
 `PanchangYogaEngine` cross-references the weekday and the already-computed
