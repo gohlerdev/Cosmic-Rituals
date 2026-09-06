@@ -1,3 +1,55 @@
+# Capability research — cycle 3, 2026-09-06 (research and roadmap only; no implementation)
+
+Third run. Instrument: one ~100-agent deep-research workflow (usage limit hit
+during verification, resumed once) whose `confirmed` array was harvested
+directly, then targeted single-source reads for the highest-value pending
+claims. Result: **16 confirmed, 0 unverified, 9 refuted.** Nothing below was
+implemented in this pass; the family roadmap sequences it.
+
+Shipped before this run and therefore excluded: prahar clock, regional solar
+months, ayanamsha schools, festival engine, Janmashtami cascade, Ekadashi with
+both of Kane's vedha clauses.
+
+## Confirmed — buildable, sequenced on the roadmap
+
+| # | Finding | Source | Votes | Roadmap |
+|---|---|---|---|---|
+| C1 | "Panchaka" names two different rules. The Moon-in-Dhanishta-to-Revati window the app ships is Raman's *Nakshatra Panchak*; the Panchak proper (Raman ch. IV; Kalaprakasika's Panchakam) is arithmetic — tithi + weekday + nakshatra + lagna, mod 9 — and needs the ascendant. | Raman, *Muhurta*, ch. IV; Kalaprakasika (Iyer 1982) | 3-0 / 2-1 | Now: rename + disclose (S). Arithmetic rule gated on the lagna decision. |
+| C2 | Chandrabala verse-level: Muhurta Chintamani, Gochara-prakarana vv. 1-4 — Moon auspicious in houses 1, 3, 6, 7, 10, 11 from the janma rashi. Matches `chandrabalaFavorableCounts` exactly. The vedha clause (paired houses 10/4, 3/9, 11/8, 1/5, 6/12, 7/2 occupied by any planet cancels) needs planetary positions Rituals does not compute. | MC, Haridas Skt. Series 185 (Sanskrit verse quoted by the panel) | 3-0 | Now: citation + disclosed limit (S) |
+| C3 | Tarabala verse-level: MC Gochara vv. 11-12 (count from birth nakshatra, mod 9, three cycles); Kalaprakasika ch. XXXIII pp. 166-167; Raman confirms no natal chart is needed and names the name-nakshatra fallback. | MC; Kalaprakasika; Raman | 3-0 | Now: citations + optional name-nakshatra fallback (S) |
+| C4 | Sunrise convention: Drik Panchang applies refraction, uses the upper limb, ignores elevation unless opted in. The app's −0.8333° altitude is the same convention. Disc-centre alternative moves sunrise ~2 min. | Drik Panchang settings page; ISKCON calendar paper | 3-0 | Now: name the convention on the calculation surface (S) |
+| C5 | Gaudiya Ekadashi: Hari Bhakti Vilasa's two-muhurta (1 h 36 min) arunodaya test equals the four ghatikas the engine implements. | ISKCON Calendar Committee paper (paraphrase, no verse locus) | 3-0 | Now: corroborating citation (S) |
+| C6 | Kalaprakasika ch. XLIII decides Sreejayanthi by **moonrise**, not nishita, taking the later of two tithis on one day — a distinct South Indian school. Moonrise engine already exists. | Kalaprakasika XLIII pp. 237-238 | 3-0 | Next: second Janmashtami school (M) |
+| C7 | Muhurta Chintamani English (Sharma, Sagar 1996, 318 pp.) is print-only; the free archive item is Sanskrit with Hindi commentary. | Princeton catalog; archive.org | 3-0 | Blocked; Sanskrit read suffices for C2-C3 |
+
+Remaining confirmed claims (C8-C16) restate shipped state (regional months,
+Bengal lineage split, prahar definitions, Lahiri variants) and are recorded in
+the run output, not repeated here.
+
+## Refuted — do not act on these
+
+- Drik Panchang uses the centre of the solar disc (0-3).
+- Drik Panchang ignores refraction (0-3).
+- Kalaprakasika publishes a Varjyam ghatika-per-nakshatra table (1-2) — the
+  app's Varjyam stays "standard almanac convention".
+- Numeric vedha thresholds by tithi (1-2).
+- Dharma Sindhu condensation claims (0-3).
+- **Kalaprakasika judges elections from panchanga limbs plus the moment's
+  rising sign alone (0-3).** This weakens the "electional-only exception" option
+  in the parked lagna decision; it does not strengthen the case for dropping
+  the rule.
+
+## Still open
+
+- The full printed daily page (Agnivasa, Shivavasa, Homahuti, Baana, Yogini,
+  Tamil Amrita/Siddha/Marana yogas, Nalla Neram, Gowri Panchangam): zero claims
+  survived. Unresearched, not refuted. Needs the almanacs read directly.
+- Verse-level sources for Varjyam, Anandadi, Ganda Mula.
+- **Parked for the owner:** the ascendant scope decision (`CLAUDE.md` line 11
+  vs cycle-1 finding 1). Nothing lagna-dependent will be built until decided.
+
+---
+
 # Capability research — 2026-08-27
 
 Deep multi-source research run (104 agents: 5 search angles, source fetch,
