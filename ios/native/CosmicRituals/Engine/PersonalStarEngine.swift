@@ -2,6 +2,16 @@ import Foundation
 
 // MARK: - Personal star relations (Tarabala, Chandrabala, Chandrashtama)
 //
+// VERSE-LEVEL SOURCE ADDED 2026-08-28 (research cycle 3, verified 3-0):
+// Kalaprakasika ch. XXXIII (N. Iyer tr., 1982 ed., pp. 166-167) states the
+// ninefold count from the birth asterism -- Janma, Sampath, Vipath, Kshema,
+// Prathyara, Sadhaga, Vadha, Maithra, Parama-Maithra -- repeating in three
+// nine-star cycles ("pariyaya") to the 27th; and pp. 51-52 define
+// Chandrashtama as the Moon's transit of the 8th sign from the natal Moon
+// sign. Both are computable from the birth nakshatra or rashi plus the day's
+// Moon, with no natal chart, and the English translation makes them
+// checkable. The almanac sources below remain as corroboration.
+//
 // All three cross-reference the user's BIRTH star with positions the engine
 // already computes for the day. Rules cross-checked across multiple mutually
 // consistent published sources before implementation (drikpanchang tarabalam

@@ -213,6 +213,59 @@ some years and be wrong in others, so none ships; a test pins the absence and
 its recorded reason. The remaining prototype entries stay unrouted until each
 is checked the same way.
 
+## Vrata decision rules (research cycle 3, 2026-08-28)
+
+The festival engine's observance instants were a design choice; they now have
+a source. Kane, *History of Dharmasastra* Vol. V pt. 1 Sec. I ch. III
+(~pp. 72-73), verified 3-0: day-time rites go on the tithi present in the
+morning even if viddha, while evening and night vratas go on the tithi present
+at evening or night even if viddha — the udaya- versus pradosha/nishita-vyapini
+split, in checkable English.
+
+**Krishna Janmashtami now ships, by the classical cascade rather than a tuned
+rule.** The Tithitattva cascade (Kane Sec. I ch. VII, ~pp. 132-135, 3-0): fast
+on Jayanti if it falls on one day, the later if two; failing that on Ashtami
+joined with Rohini, later if two; failing that on Ashtami at midnight; and if
+Ashtami is at midnight on two days **or on neither**, the later day. That last
+clause resolves exactly the case the engine withheld — in 2026 Krishna Ashtami
+touched no nishita instant — and the cascade reaches the published 4 September
+at its Rohini-overlap tier. The Nirnaya Sindhu is confirmed (3-0) to carry the
+same nirnaya but only in Sanskrit; Kane is the checkable rendering. A divergent
+South Indian school is named and NOT blended: Kalaprakasika ch. XLIII decides
+Sreejayanthi by moonrise, not nishita.
+
+**Ekadashi splits the two traditions, and both of Kane's clauses matter.**
+Sec. I ch. V (~pp. 114-115, 3-0): a Vaishnava may not fast on an Ekadashi
+preceded by *arunodaya*-vedha (Dashami reaching into the last four ghatikas
+before sunrise) **or by Dashami persisting to the instant of sunrise**
+(*suryodaya*-vedha), and fasts on the following Dvadashi instead; smartas are
+not bound by either.
+
+That second clause is where a first draft of this engine was wrong, and the
+error is worth recording. Implementing only arunodaya-vedha produced a build
+that split the traditions on **no day of 2026 at all** while passing every
+structural test. Checked against a published smarta/vaishnava calendar, the
+2026 splits are Yogini (10/11 July) and Prabodhini (20/21 November) — both
+*kshaya* Ekadashis, which is precisely suryodaya-vedha: a tithi that begins
+after one sunrise and ends before the next leaves Dashami running through the
+earlier sunrise. With both clauses implemented the engine reproduces both
+published splits and additionally splits 26 May, inside 2026's Adhika
+Jyeshtha, by the arunodaya clause. The test asserts containment of the two
+published splits rather than an exact set, because the consulted table was not
+established to be exhaustive.
+
+**A vacuous control, and the refactor it forced.** Sabotaging the cascade's
+final branch broke nothing: that branch fires in no year from 2020 to 2035, so
+it was untested. The cascade is now a pure function of three booleans
+(`chooseTier`) and every tier — including "on two days or on neither, the
+later day" — is exercised directly. Both retried controls turn it red.
+
+Tarabala and Chandrabala gained verse-level sources: Kalaprakasika ch. XXXIII
+(N. Iyer tr., pp. 166-167) for the ninefold count in three nine-star cycles,
+and pp. 51-52 for Chandrashtama as the Moon's transit of the eighth sign from
+the natal Moon sign. Both need only a birth nakshatra or rashi and the day's
+Moon — no natal chart, so no scope rule is touched.
+
 ## Vara-Nakshatra combination yogas
 
 `PanchangYogaEngine` cross-references the weekday and the already-computed
