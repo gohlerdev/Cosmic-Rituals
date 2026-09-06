@@ -170,6 +170,49 @@ identical rows would imply a choice that makes no difference.
 Negative controls: zeroing the offsets, flipping the default to KP, and giving
 one school its own precession rate each turn dedicated tests red.
 
+## Festivals: specified, not tabulated
+
+The old `FestivalData` prototype keyed festivals to (month, tithi-0-29) and its
+own header admitted two holes — no Adhika handling, no observance precedence.
+It carried a third it did not name: **Krishna-paksha entries used Purnimanta
+month names while the engine computes Amanta**, so the same lunar night was
+labelled with two different months and nothing recorded which was meant.
+
+`FestivalRuleEngine` replaces the keying. Every rule declares four things:
+
+1. **Which month, and in which naming.** A Krishna-paksha festival has two
+   correct month names — Maha Shivaratri is Krishna Chaturdashi of *Amanta*
+   Magha and of *Purnimanta* Phalguna. A rule naming one without saying which
+   is ambiguous by construction. A test fails any Krishna rule that does not
+   state both.
+2. **Paksha and tithi separately**, not a 0-29 index whose meaning depends on
+   an unstated convention.
+3. **The observance instant** — sunrise, madhyahna, pradosha, or nishita.
+4. **The published date it was verified against.**
+
+**Observance precedence is load-bearing, and Rama Navami proves it.** In 2026
+Chaitra Shukla Navami runs 11:48 on 26 March to 10:06 on 27 March. It is still
+running at sunrise on the 27th, so a sunrise-prevailing rule lands a day late;
+madhyahna on the 26th falls inside the tithi and reproduces the published date.
+The negative control is unambiguous: forcing every observance to sunrise turns
+**all four** shipped festival dates red, not just this one.
+
+**Verified and shipped (2026 published dates):** Maha Shivaratri 15 Feb
+(nishita) · Rama Navami 26 Mar (madhyahna) · Ganesh Chaturthi 14 Sep
+(madhyahna) · Diwali Lakshmi Puja 8 Nov (pradosha). Adhika lunations carry no
+festivals; observances fall in the nija month.
+
+**Attempted and deliberately NOT shipped.** Krishna Janmashtami: a
+single-instant nishita rule cannot express it. Measured at Delhi in 2026, the
+tithi at successive nishita instants runs 21 (3 Sep) then 23 (4 Sep) — Krishna
+Ashtami touches no nishita at all that year, because it begins and ends between
+two midnights, while the published date is 4 September. The classical rule is
+correspondingly conditional, and is precisely where the smarta and vaishnava
+traditions are documented to diverge. A tuned approximation would look right in
+some years and be wrong in others, so none ships; a test pins the absence and
+its recorded reason. The remaining prototype entries stay unrouted until each
+is checked the same way.
+
 ## Vara-Nakshatra combination yogas
 
 `PanchangYogaEngine` cross-references the weekday and the already-computed

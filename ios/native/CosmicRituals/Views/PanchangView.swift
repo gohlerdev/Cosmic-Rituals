@@ -5,6 +5,7 @@ struct PanchangView: View {
     @State private var knownToday = Date()
     @State private var lunarInfo: LunarMonthInfo?
     @State private var regionalMonths: [RegionalSolarMonth] = []
+    @State private var todaysFestivals: [VerifiedFestivalOccurrence] = []
     @Environment(\.scenePhase) private var scenePhase
     @State private var dayBundle: DailyPanchangBundle?
     @State private var detailMuhurta: Muhurta?
@@ -193,6 +194,10 @@ struct PanchangView: View {
                 }
             }.value
             if context == calculationContext { regionalMonths = regional }
+            let festivals = await Task.detached(priority: .utility) {
+                FestivalRuleEngine.festivals(on: context)
+            }.value
+            if context == calculationContext { todaysFestivals = festivals }
         }
         .task(id: calculationContext) {
             let context = calculationContext
@@ -459,6 +464,7 @@ struct PanchangView: View {
 
                 personalStarsCard(for: p)
 
+                festivalCard
                 lunarCalendarCard
                 siderealSchoolCard
 
@@ -824,6 +830,38 @@ struct PanchangView: View {
             MuhurtaSummaryPill(label: "★ Auspicious",  spokenLabel: "auspicious",  count: auspicious,   color: .green)
             MuhurtaSummaryPill(label: "◐ Mixed",       spokenLabel: "mixed",       count: mixed,        color: .orange)
             MuhurtaSummaryPill(label: "✕ Avoid",       spokenLabel: "to avoid",    count: inauspicious, color: .red)
+        }
+    }
+
+    /// Verified festivals falling on this civil day. The list is short on
+    /// purpose: only rules checked against a published date ship, and each
+    /// says which observance instant decided the day -- the precedence that
+    /// puts several major festivals on a different day from a naive
+    /// sunrise rule.
+    @ViewBuilder
+    private var festivalCard: some View {
+        if !todaysFestivals.isEmpty {
+            CosmicGlassCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    CosmicSectionHeader(title: "Today", icon: "sparkles")
+                    ForEach(todaysFestivals) { festival in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(festival.name)
+                                .font(.subheadline.bold())
+                                .foregroundStyle(theme.primary)
+                            Text("Decided by \(festival.observance.explanation).")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                    Text("Only festivals whose rule was checked against a published date are listed. Each names the observance instant that decides its day; a sunrise-only rule places several of these a day out.")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.horizontal)
         }
     }
 
