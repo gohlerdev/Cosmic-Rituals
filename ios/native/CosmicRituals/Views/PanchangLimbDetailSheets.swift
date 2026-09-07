@@ -11,7 +11,7 @@ struct TithiDetailSheet: View {
         let detail = TithiDetail.from(tithiIndex: tithiIndex)
         NavigationStack {
             ZStack {
-                CosmicStarfieldBackground()
+                RitualSanctuaryBackground()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         // Header
@@ -123,7 +123,7 @@ struct YogaDetailSheet: View {
         let detail = YogaDetail.from(yogaIndex: yogaIndex)
         NavigationStack {
             ZStack {
-                CosmicStarfieldBackground()
+                RitualSanctuaryBackground()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         CosmicGlassCard(cornerRadius: 18) {
@@ -187,7 +187,7 @@ struct KaranaDetailSheet: View {
         let detail = KaranaDetail.from(karanaIndex: karanaIndex)
         NavigationStack {
             ZStack {
-                CosmicStarfieldBackground()
+                RitualSanctuaryBackground()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         CosmicGlassCard(cornerRadius: 18) {

@@ -47,19 +47,30 @@ enum PanchangPDFExporter {
             let bodyFont = UIFont.systemFont(ofSize: 13, weight: .regular)
             let labelFont = UIFont.systemFont(ofSize: 10, weight: .regular)
 
-            draw("✦ Cosmic Rituals", at: CGPoint(x: 36, y: 24), font: titleFont, color: gold)
-
-            let dateStr = longDate(context.localNoon, timeZone: context.timeZone)
-            draw(dateStr, at: CGPoint(x: 36, y: 60), font: subtitleFont, color: .white)
-            draw("Vedic Panchang · noon reference · \(context.timeZoneIdentifier)", at: CGPoint(x: 36, y: 80), font: labelFont, color: subtle.withAlphaComponent(0.8))
-
-            // Compute panchang data
+            // Compute all values before drawing so the header and body share the
+            // same sunrise-based reference instant.
             let p = CosmicEngine.getPanchang(context: context)
             let nak = CosmicEngine.getMoonNakshatraPada(context: context)
             let sunNak = CosmicEngine.getSunNakshatra(context: context)
             let sunSignIdx = Int(sunNak.degree / 30.0) % 12
             let ss = CosmicEngine.getSunriseSunset(context: context)
-            let tithiEnd = CosmicEngine.getTithiEndTime(context: context)
+
+            func transitionSuffix(_ transition: PanchangTransition?) -> String {
+                transition.map {
+                    let ending = $0.endTime.ritualTransitionLabel(
+                        relativeTo: p.date,
+                        in: context.timeZone
+                    )
+                    return " · until \(ending), then \($0.nextName)"
+                } ?? ""
+            }
+
+            draw("✦ Cosmic Rituals", at: CGPoint(x: 36, y: 24), font: titleFont, color: gold)
+
+            let dateStr = longDate(context.localNoon, timeZone: context.timeZone)
+            draw(dateStr, at: CGPoint(x: 36, y: 60), font: subtitleFont, color: .white)
+            let referenceLabel = p.sunriseTime == nil ? "local-noon fallback" : "sunrise reference"
+            draw("Vedic Panchang · \(referenceLabel) · \(context.timeZoneIdentifier)", at: CGPoint(x: 36, y: 80), font: labelFont, color: subtle.withAlphaComponent(0.8))
 
             var y: CGFloat = 140
 
@@ -70,27 +81,38 @@ enum PanchangPDFExporter {
             let limbs: [(String, String)] = [
                 ("Vara (Weekday)", p.weekdayName),
                 ("Tithi (Lunar Day)", p.tithiName + (p.tithiIndex < 15 ? " · Shukla Paksha" : " · Krishna Paksha")
-                 + (tithiEnd.map { " · ends \(shortTime($0, timeZone: context.timeZone))" } ?? "")),
-                ("Nakshatra", "\(p.nakshatraName) · Pada \(nak.pada) · Lord: \(nak.nakshatraLord.rawValue)"),
-                ("Yoga", p.yogaName),
-                ("Karana", p.karanaName),
+                 + transitionSuffix(p.transitions.tithi)),
+                ("Nakshatra", "\(p.nakshatraName) · Pada \(nak.pada) · Lord: \(nak.nakshatraLord.rawValue)"
+                 + transitionSuffix(p.transitions.nakshatra)),
+                ("Yoga", p.yogaName + transitionSuffix(p.transitions.yoga)),
+                ("Karana", p.karanaName + transitionSuffix(p.transitions.karana)),
             ]
             for (label, value) in limbs {
                 draw(label, at: CGPoint(x: 48, y: y), font: labelFont, color: subtle)
-                draw(value, at: CGPoint(x: 200, y: y), font: bodyFont, color: .white)
-                y += 22
+                let valueHeight = drawWrapped(
+                    value,
+                    in: CGRect(x: 200, y: y, width: pageRect.width - 236, height: 58),
+                    font: bodyFont,
+                    color: .white
+                )
+                y += max(22, valueHeight + 6)
             }
 
             y += 12
 
-            // Section: validated solar values only. Moonrise is intentionally hidden
-            // until a real lunar altitude-crossing solver is available.
-            y = drawSection(title: "✦ Solar Times", at: y, width: pageRect.width,
+            // Section: celestial times. Moonrise/moonset ship via the
+            // verified Meeus ch. 15 solver (USNO fixtures) and export the
+            // same values the screen shows -- the earlier "hidden until a
+            // real solver exists" boundary is closed.
+            y = drawSection(title: "✦ Celestial Times", at: y, width: pageRect.width,
                             headerFont: headerFont, color: gold, bgColor: gold.withAlphaComponent(0.08))
 
+            let moonEvents = CelestialRiseSet.moonRiseSet(context: context)
             let times: [(String, String)] = [
                 ("Sunrise", ss.map { shortTime($0.sunrise, timeZone: context.timeZone) } ?? "Unavailable"),
                 ("Sunset",  ss.map { shortTime($0.sunset, timeZone: context.timeZone) } ?? "Unavailable"),
+                ("Moonrise", moonEvents.moonrise.map { shortTime($0, timeZone: context.timeZone) } ?? "None this day"),
+                ("Moonset", moonEvents.moonset.map { shortTime($0, timeZone: context.timeZone) } ?? "None this day"),
                 ("Surya Rashi", ZodiacSign.fromIndex(sunSignIdx).name),
                 ("Surya Nakshatra", sunNak.nakshatraName),
                 ("Chandra Rashi", p.moonSignName),
@@ -103,6 +125,27 @@ enum PanchangPDFExporter {
 
             y += 12
 
+            // Section: inauspicious kalas, matching the screen's card so the
+            // exported day is not a silently reduced subset of it.
+            let kalaRows: [(String, (start: Date, end: Date)?)] = [
+                ("Rahu Kala", CosmicEngine.getRahuKala(context: context)),
+                ("Yamaganda", CosmicEngine.getYamaganda(context: context)),
+                ("Gulika Kala", CosmicEngine.getGulikaKala(context: context)),
+            ]
+            if kalaRows.contains(where: { $0.1 != nil }) {
+                y = drawSection(title: "✦ Inauspicious Kalas", at: y, width: pageRect.width,
+                                headerFont: headerFont, color: gold, bgColor: gold.withAlphaComponent(0.08))
+                for (label, window) in kalaRows {
+                    let value = window.map {
+                        "\(shortTime($0.start, timeZone: context.timeZone))–\(shortTime($0.end, timeZone: context.timeZone))"
+                    } ?? "No sunrise arc"
+                    draw(label, at: CGPoint(x: 48, y: y), font: labelFont, color: subtle)
+                    draw(value, at: CGPoint(x: 200, y: y), font: bodyFont, color: .white)
+                    y += 22
+                }
+                y += 12
+            }
+
             // Section: Muhurtas
             y = drawSection(title: "✦ Today's Muhurtas (top 10)", at: y, width: pageRect.width,
                             headerFont: headerFont, color: gold, bgColor: gold.withAlphaComponent(0.08))
@@ -110,10 +153,17 @@ enum PanchangPDFExporter {
             let muhurtas = CosmicEngine.getMuhurtas(context: context)
             let notable = muhurtas.filter { $0.quality == .excellent || $0.quality == .auspicious }.prefix(10)
             for m in notable {
-                let timeStr = "\(shortTime(m.startTime, timeZone: context.timeZone))–\(shortTime(m.endTime, timeZone: context.timeZone))"
+                let start = m.startTime.ritualTransitionLabel(relativeTo: p.date, in: context.timeZone)
+                let end = m.endTime.ritualTransitionLabel(relativeTo: p.date, in: context.timeZone)
+                let timeStr = "\(start)–\(end)"
                 draw(m.quality.emoji + " " + m.name, at: CGPoint(x: 48, y: y), font: bodyFont, color: .white)
-                draw(timeStr, at: CGPoint(x: 300, y: y), font: labelFont, color: subtle)
-                y += 20
+                let timeHeight = drawWrapped(
+                    timeStr,
+                    in: CGRect(x: 300, y: y, width: pageRect.width - 336, height: 38),
+                    font: labelFont,
+                    color: subtle
+                )
+                y += max(20, timeHeight + 4)
                 if y > pageRect.height - 80 { break }
             }
 
@@ -145,6 +195,38 @@ enum PanchangPDFExporter {
     private static func draw(_ text: String, at point: CGPoint, font: UIFont, color: UIColor) {
         let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
         (text as NSString).draw(at: point, withAttributes: attrs)
+    }
+
+    @discardableResult
+    private static func drawWrapped(
+        _ text: String,
+        in rect: CGRect,
+        font: UIFont,
+        color: UIColor
+    ) -> CGFloat {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byWordWrapping
+        paragraph.lineSpacing = 1
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: color,
+            .paragraphStyle: paragraph,
+        ]
+        let options: NSStringDrawingOptions = [.usesLineFragmentOrigin, .usesFontLeading]
+        let bounds = (text as NSString).boundingRect(
+            with: CGSize(width: rect.width, height: rect.height),
+            options: options,
+            attributes: attrs,
+            context: nil
+        )
+        let height = min(rect.height, ceil(bounds.height))
+        (text as NSString).draw(
+            with: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: height),
+            options: options,
+            attributes: attrs,
+            context: nil
+        )
+        return height
     }
 
     private static func shortTime(_ date: Date, timeZone: TimeZone) -> String {

@@ -1,0 +1,30 @@
+.DS_Store
+
+# Native iOS local build and signing artifacts
+/ios/native/build/
+/ios/native/DerivedData/
+/ios/native/.build/
+/ios/native/.derived-*/
+/ios/native/.swiftpm/
+/ios/native/**/xcuserdata/
+/ios/native/**/*.xcuserstate
+/ios/**/*.xcarchive
+/ios/**/*.ipa
+/ios/**/*.dSYM
+/ios/**/*.dSYM.zip
+/ios/**/*.xcresult
+/ios/**/*.xcdistributionlogs
+/ios/**/*.xctestrun
+/ios/**/*.profdata
+/ios/**/*.trace
+
+# Local credentials and environment
+/.env
+/.env.*
+/credentials/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem

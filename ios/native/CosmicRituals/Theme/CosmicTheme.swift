@@ -53,9 +53,9 @@ struct CosmicColorScheme: Sendable {
     /// Explicit semantic roles prevent an already-presented sheet from retaining
     /// dark system label colors while the user switches to a light app theme.
     /// Dark variants continue using the existing system semantics unchanged.
-    var semanticPrimaryText: Color { isLight ? onSurface : .primary }
-    var semanticSecondaryText: Color { isLight ? onSurface.opacity(0.72) : .secondary }
-    var semanticTertiaryText: Color { isLight ? onSurface.opacity(0.60) : Color.secondary.opacity(0.74) }
+    var semanticPrimaryText: Color { onSurface }
+    var semanticSecondaryText: Color { onSurface.opacity(isLight ? 0.80 : 0.82) }
+    var semanticTertiaryText: Color { onSurface.opacity(isLight ? 0.70 : 0.72) }
     var semanticDivider: Color { isLight ? onSurface.opacity(0.16) : Color.white.opacity(0.10) }
     var semanticBorder: Color { isLight ? onSurface.opacity(0.22) : Color.white.opacity(0.10) }
     var semanticHighlight: Color { isLight ? onSurface.opacity(0.08) : Color.white.opacity(0.20) }
@@ -65,86 +65,86 @@ struct CosmicColorScheme: Sendable {
     var selectedControlForeground: Color { background }
 
     static let obsidianGold = CosmicColorScheme(
-        id: "obsidian_gold", displayName: "Obsidian Gold",
-        primary:         Color(hex: "E5A97C"),
-        secondary:       Color(hex: "7E8EAA"),
-        tertiary:        Color(hex: "73A5AA"),
-        background:      Color(hex: "08090F"),
-        surface:         Color(hex: "111421"),
-        surfaceElevated: Color(hex: "1A2030"),
-        onSurface:       Color(hex: "E8EAED"),
-        gradientTop:     Color(hex: "08090F"),
-        gradientBottom:  Color(hex: "130E20"),
+        id: "obsidian_gold", displayName: "Deep Sandhya",
+        primary:         Color(hex: "F0B36E"),
+        secondary:       Color(hex: "D66A47"),
+        tertiary:        Color(hex: "9CB77D"),
+        background:      Color(hex: "100703"),
+        surface:         Color(hex: "211108"),
+        surfaceElevated: Color(hex: "321A0D"),
+        onSurface:       Color(hex: "FFF3E4"),
+        gradientTop:     Color(hex: "090301"),
+        gradientBottom:  Color(hex: "260D04"),
         isLight: false
     )
 
     static let midnightAurora = CosmicColorScheme(
-        id: "midnight_aurora", displayName: "Midnight Aurora",
-        primary:         Color(hex: "8FD5C4"),
-        secondary:       Color(hex: "A58FD6"),
-        tertiary:        Color(hex: "E7B97A"),
-        background:      Color(hex: "050E14"),
-        surface:         Color(hex: "0D1A22"),
-        surfaceElevated: Color(hex: "162430"),
-        onSurface:       Color(hex: "EAF3F1"),
-        gradientTop:     Color(hex: "050E14"),
-        gradientBottom:  Color(hex: "091620"),
+        id: "midnight_aurora", displayName: "Temple Dawn",
+        primary:         Color(hex: "F4C574"),
+        secondary:       Color(hex: "C85F46"),
+        tertiary:        Color(hex: "D99458"),
+        background:      Color(hex: "150806"),
+        surface:         Color(hex: "28110D"),
+        surfaceElevated: Color(hex: "3B1B13"),
+        onSurface:       Color(hex: "FFF2DF"),
+        gradientTop:     Color(hex: "110503"),
+        gradientBottom:  Color(hex: "351008"),
         isLight: false
     )
 
     static let celestialPlum = CosmicColorScheme(
-        id: "celestial_plum", displayName: "Celestial Plum",
-        primary:         Color(hex: "D7A6B8"),
-        secondary:       Color(hex: "9DA7D9"),
-        tertiary:        Color(hex: "E2C278"),
-        background:      Color(hex: "0E0A14"),
-        surface:         Color(hex: "1A1224"),
-        surfaceElevated: Color(hex: "261A34"),
-        onSurface:       Color(hex: "F1EAF2"),
-        gradientTop:     Color(hex: "0E0A14"),
-        gradientBottom:  Color(hex: "160E22"),
+        id: "celestial_plum", displayName: "Kumkum Night",
+        primary:         Color(hex: "E8A764"),
+        secondary:       Color(hex: "C84F62"),
+        tertiary:        Color(hex: "D7B56B"),
+        background:      Color(hex: "140508"),
+        surface:         Color(hex: "260D13"),
+        surfaceElevated: Color(hex: "39151D"),
+        onSurface:       Color(hex: "FFF0E8"),
+        gradientTop:     Color(hex: "100305"),
+        gradientBottom:  Color(hex: "310811"),
         isLight: false
     )
 
     static let cloudDancer = CosmicColorScheme(
-        id: "cloud_dancer", displayName: "Cloud Dancer",
-        primary:         Color(hex: "755F4C"),
-        secondary:       Color(hex: "4F7F83"),
-        tertiary:        Color(hex: "956C88"),
-        background:      Color(hex: "FFFEFB"),
-        surface:         Color(hex: "FFFCF8"),
-        surfaceElevated: Color(hex: "F6F0E8"),
-        onSurface:       Color(hex: "24211D"),
-        gradientTop:     Color(hex: "FFF8F2"),
-        gradientBottom:  Color(hex: "EDE6DC"),
+        id: "cloud_dancer", displayName: "Ghee Lamp Ivory",
+        primary:         Color(hex: "98541F"),
+        secondary:       Color(hex: "A43F32"),
+        tertiary:        Color(hex: "5E7341"),
+        background:      Color(hex: "FFF8E9"),
+        surface:         Color(hex: "FFFCF4"),
+        surfaceElevated: Color(hex: "F6E7C9"),
+        onSurface:       Color(hex: "2B1C0F"),
+        gradientTop:     Color(hex: "FFFDF5"),
+        gradientBottom:  Color(hex: "F3D9AD"),
         isLight: true
     )
 
     static let mochaAura = CosmicColorScheme(
-        id: "mocha_aura", displayName: "Mocha Aura",
-        primary:         Color(hex: "8F604F"),
-        secondary:       Color(hex: "4F7D63"),
-        tertiary:        Color(hex: "556F95"),
-        background:      Color(hex: "FFFDF9"),
-        surface:         Color(hex: "FFF8F1"),
-        surfaceElevated: Color(hex: "F6ECE2"),
-        onSurface:       Color(hex: "241C17"),
-        gradientTop:     Color(hex: "FFF8F1"),
-        gradientBottom:  Color(hex: "EDE0D4"),
+        id: "mocha_aura", displayName: "Sandalwood",
+        primary:         Color(hex: "8A4C24"),
+        secondary:       Color(hex: "9D4A38"),
+        tertiary:        Color(hex: "667647"),
+        background:      Color(hex: "FAF0DF"),
+        surface:         Color(hex: "FFF9ED"),
+        surfaceElevated: Color(hex: "EDDBBC"),
+        onSurface:       Color(hex: "2C2116"),
+        gradientTop:     Color(hex: "FFF9ED"),
+        gradientBottom:  Color(hex: "E8CEAA"),
         isLight: true
     )
 
     static let celestialMist = CosmicColorScheme(
-        id: "celestial_mist", displayName: "Celestial Mist",
-        primary:         Color(hex: "336F86"),
-        secondary:       Color(hex: "725EA1"),
-        tertiary:        Color(hex: "A56F4E"),
-        background:      Color(hex: "FDFFFF"),
-        surface:         Color(hex: "F8FCFE"),
-        surfaceElevated: Color(hex: "EEF6FA"),
-        onSurface:       Color(hex: "122027"),
-        gradientTop:     Color(hex: "F0F8FF"),
-        gradientBottom:  Color(hex: "E0EFF7"),
+        id: "celestial_mist", displayName: "Lotus Ash",
+        primary:         Color(hex: "7D4A32"),
+        secondary:       Color(hex: "8A4F58"),
+        tertiary:        Color(hex: "5C7055"),
+        background:      Color(hex: "F4F0EA"),
+        surface:         Color(hex: "FCFAF6"),
+        surfaceElevated: Color(hex: "E8DED2"),
+        onSurface:       Color(hex: "28201B"),
+        gradientTop:     Color(hex: "FBF8F2"),
+        gradientBottom:  Color(hex: "E4D6C8"),
         isLight: true
     )
 }
@@ -176,12 +176,12 @@ enum CosmicThemeVariant: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .cosmicDark:   return "Obsidian Gold"
-        case .nebulaBlue:   return "Midnight Aurora"
-        case .vedicSaffron: return "Celestial Plum"
-        case .lunarSilver:  return "Cloud Dancer"
-        case .solarGold:    return "Mocha Aura"
-        case .auroraGreen:  return "Celestial Mist"
+        case .cosmicDark:   return "Deep Sandhya"
+        case .nebulaBlue:   return "Temple Dawn"
+        case .vedicSaffron: return "Kumkum Night"
+        case .lunarSilver:  return "Ghee Lamp Ivory"
+        case .solarGold:    return "Sandalwood"
+        case .auroraGreen:  return "Lotus Ash"
         }
     }
 }
@@ -199,202 +199,67 @@ extension CosmicThemeVariant {
     }
 }
 
-// MARK: - Animated Starfield Background
+// MARK: - Ceremonial Background
 
-private struct StarData {
-    let x, y: CGFloat
-    let r: CGFloat
-    let baseOpacity: Double
-    let twinklePhase: Double
-    let tier: Int // 0=tiny, 1=medium, 2=large with glow
-}
-
-struct CosmicStarfieldBackground: View {
+struct RitualSanctuaryBackground: View {
     @Environment(\.cosmicTheme) private var theme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private let stars: [StarData] = {
-        var out = [StarData]()
-        var rng = SystemRandomNumberGenerator()
-        // Tier 0 — tiny, very dim
-        for i in 0..<90 {
-            out.append(StarData(
-                x: CGFloat.random(in: 0...1, using: &rng),
-                y: CGFloat.random(in: 0...1, using: &rng),
-                r: CGFloat.random(in: 0.28...0.58, using: &rng),
-                baseOpacity: Double.random(in: 0.12...0.38, using: &rng),
-                twinklePhase: Double(i) * 0.41,
-                tier: 0
-            ))
-        }
-        // Tier 1 — medium
-        for i in 0..<65 {
-            out.append(StarData(
-                x: CGFloat.random(in: 0...1, using: &rng),
-                y: CGFloat.random(in: 0...1, using: &rng),
-                r: CGFloat.random(in: 0.58...1.05, using: &rng),
-                baseOpacity: Double.random(in: 0.30...0.60, using: &rng),
-                twinklePhase: Double(i) * 0.73,
-                tier: 1
-            ))
-        }
-        // Tier 2 — large, bright, with glow halo
-        for i in 0..<22 {
-            out.append(StarData(
-                x: CGFloat.random(in: 0.04...0.96, using: &rng),
-                y: CGFloat.random(in: 0.04...0.96, using: &rng),
-                r: CGFloat.random(in: 1.05...1.75, using: &rng),
-                baseOpacity: Double.random(in: 0.55...0.90, using: &rng),
-                twinklePhase: Double(i) * 1.09,
-                tier: 2
-            ))
-        }
-        return out
-    }()
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        if theme.isLight {
-            LinearGradient(colors: [theme.gradientTop, theme.gradientBottom], startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-        } else {
-            darkBackground
-        }
-    }
+        GeometryReader { proxy in
+            ZStack {
+                theme.background
 
-    private var darkBackground: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 60 : nil, paused: reduceMotion)) { ctx in
-            let t = ctx.date.timeIntervalSinceReferenceDate
-            Canvas { gfx, size in
-                // 1. Background gradient
-                gfx.fill(
-                    Path(CGRect(origin: .zero, size: size)),
-                    with: .linearGradient(
-                        Gradient(colors: [theme.gradientTop, theme.gradientBottom]),
-                        startPoint: .zero,
-                        endPoint: CGPoint(x: 0, y: size.height)
-                    )
+                Image("RitualSanctuaryBackground")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .clipped()
+                    .saturation(theme.isLight ? 0.72 : 0.92)
+                    .contrast(theme.isLight ? 0.88 : 1.02)
+                    .opacity(imageOpacity)
+
+                LinearGradient(
+                    colors: readabilityVeil,
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
-
-                // 2. Nebula clouds (3 layers, slow breathing)
-                let breathe = 0.5 + 0.5 * sin(t * 0.12)
-                // Blue-violet nebula — top right
-                gfx.fill(
-                    Path(ellipseIn: CGRect(x: size.width*0.42, y: -size.height*0.05,
-                                           width: size.width*0.65, height: size.height*0.40)),
-                    with: .color(theme.secondary.opacity(0.045 + breathe * 0.018))
-                )
-                // Warm gold nebula — left center
-                gfx.fill(
-                    Path(ellipseIn: CGRect(x: -size.width*0.10, y: size.height*0.30,
-                                           width: size.width*0.50, height: size.height*0.22)),
-                    with: .color(theme.primary.opacity(0.038 + breathe * 0.012))
-                )
-                // Teal nebula — bottom right, very faint
-                gfx.fill(
-                    Path(ellipseIn: CGRect(x: size.width*0.60, y: size.height*0.68,
-                                           width: size.width*0.45, height: size.height*0.18)),
-                    with: .color(theme.tertiary.opacity(0.025 + breathe * 0.010))
-                )
-
-                // 3. Stars
-                let twinkleRate = 1.209
-                for star in stars {
-                    let twinkle  = 0.55 + 0.45 * sin(t * twinkleRate + star.twinklePhase)
-                    let opacity  = star.baseOpacity * twinkle
-                    let pt = CGPoint(x: star.x * size.width, y: star.y * size.height)
-                    let r = star.r
-
-                    if star.tier == 2 {
-                        // Outer soft glow
-                        let g1r = r * 4.5
-                        gfx.fill(
-                            Path(ellipseIn: CGRect(x: pt.x-g1r, y: pt.y-g1r, width: g1r*2, height: g1r*2)),
-                            with: .color(Color.white.opacity(opacity * 0.055))
-                        )
-                        // Inner glow
-                        let g2r = r * 2.2
-                        gfx.fill(
-                            Path(ellipseIn: CGRect(x: pt.x-g2r, y: pt.y-g2r, width: g2r*2, height: g2r*2)),
-                            with: .color(Color.white.opacity(opacity * 0.14))
-                        )
-                    }
-                    // Star core
-                    let finalOpacity: Double
-                    switch star.tier {
-                    case 0:  finalOpacity = opacity * 0.22
-                    case 1:  finalOpacity = opacity * 0.42
-                    default: finalOpacity = opacity * 0.88
-                    }
-                    gfx.fill(
-                        Path(ellipseIn: CGRect(x: pt.x-r, y: pt.y-r, width: r*2, height: r*2)),
-                        with: .color(Color.white.opacity(finalOpacity))
-                    )
-                }
-
-                // 4. Shooting star — appears every 24 seconds, lasts 0.72s
-                let shootPeriod = 24.0
-                let shootDuration = 0.72
-                let shootPhase = t.truncatingRemainder(dividingBy: shootPeriod)
-                if shootPhase < shootDuration {
-                    let progress = shootPhase / shootDuration
-                    // Ease in, peak, ease out
-                    let eased: Double
-                    if progress < 0.15 { eased = progress / 0.15 }
-                    else if progress > 0.72 { eased = (1.0 - progress) / 0.28 }
-                    else { eased = 1.0 }
-
-                    let sx = size.width * 0.74, sy = size.height * 0.07
-                    let ex = size.width * 0.32, ey = size.height * 0.44
-                    let headX = sx + progress * (ex - sx)
-                    let headY = sy + progress * (ey - sy)
-                    let dx = (ex - sx), dy = (ey - sy)
-
-                    // Trail segments
-                    for j in 0..<16 {
-                        let frac = Double(j) / 16.0
-                        let tx = headX - frac * dx * 0.20
-                        let ty = headY - frac * dy * 0.20
-                        let tOpacity = (1.0 - frac) * (1.0 - frac) * eased * 0.85
-                        let tr = max(0.18, (1.0 - frac * 0.72) * 1.7)
-                        gfx.fill(
-                            Path(ellipseIn: CGRect(x: tx-tr, y: ty-tr, width: tr*2, height: tr*2)),
-                            with: .color(Color.white.opacity(tOpacity))
-                        )
-                    }
-                    // Head glow
-                    let hgr = 4.5
-                    gfx.fill(
-                        Path(ellipseIn: CGRect(x: headX-hgr, y: headY-hgr, width: hgr*2, height: hgr*2)),
-                        with: .color(Color.white.opacity(eased * 0.22))
-                    )
-                    let hr = 1.6
-                    gfx.fill(
-                        Path(ellipseIn: CGRect(x: headX-hr, y: headY-hr, width: hr*2, height: hr*2)),
-                        with: .color(Color.white.opacity(eased * 0.92))
-                    )
-                }
-
-                // 5. Vignette — dark edges
-                let ve = min(size.width, size.height) * 0.38
-                gfx.fill(Path(CGRect(x: 0, y: 0, width: size.width, height: ve)),
-                    with: .linearGradient(Gradient(colors: [Color.black.opacity(0.42), .clear]),
-                                         startPoint: .init(x: 0, y: 0), endPoint: .init(x: 0, y: ve)))
-                gfx.fill(Path(CGRect(x: 0, y: size.height-ve, width: size.width, height: ve)),
-                    with: .linearGradient(Gradient(colors: [.clear, Color.black.opacity(0.48)]),
-                                         startPoint: .init(x: 0, y: size.height-ve), endPoint: .init(x: 0, y: size.height)))
-                gfx.fill(Path(CGRect(x: 0, y: 0, width: ve*0.65, height: size.height)),
-                    with: .linearGradient(Gradient(colors: [Color.black.opacity(0.28), .clear]),
-                                         startPoint: .init(x: 0, y: 0), endPoint: .init(x: ve*0.65, y: 0)))
-                gfx.fill(Path(CGRect(x: size.width-ve*0.65, y: 0, width: ve*0.65, height: size.height)),
-                    with: .linearGradient(Gradient(colors: [.clear, Color.black.opacity(0.28)]),
-                                         startPoint: .init(x: size.width-ve*0.65, y: 0), endPoint: .init(x: size.width, y: 0)))
             }
         }
         .ignoresSafeArea()
+        .accessibilityHidden(true)
+    }
+
+    private var imageOpacity: Double {
+        if reduceTransparency {
+            return theme.isLight ? 0.22 : 0.44
+        }
+        // Dark themes only. Measured with Veil Bench against the real sanctuary asset:
+        // at 0.78 the photograph's specular doorway leaves secondary text at 3.21:1 and
+        // tertiary at 2.85:1 on all three dark themes. 0.52 clears AA (4.54:1) without
+        // touching the veil gradient, which keeps the ceremonial composition as designed
+        // and makes the imagery more subordinate to the text, per NEXT_LEVEL_PLAN 5.1.
+        // Light themes already clear AA at 0.42 and are unchanged.
+        return theme.isLight ? 0.42 : 0.52
+    }
+
+    private var readabilityVeil: [Color] {
+        if theme.isLight {
+            return [
+                theme.gradientTop.opacity(0.84),
+                theme.background.opacity(0.72),
+                theme.gradientBottom.opacity(0.86)
+            ]
+        }
+        return [
+            Color.black.opacity(0.34),
+            theme.background.opacity(0.30),
+            theme.gradientBottom.opacity(0.62)
+        ]
     }
 }
 
-// MARK: - Glass Card
+// MARK: - Ceremonial Surface
 
 struct CosmicGlassCard<Content: View>: View {
     let cornerRadius: CGFloat
@@ -403,7 +268,7 @@ struct CosmicGlassCard<Content: View>: View {
     @Environment(\.cosmicTheme) private var theme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
-    init(cornerRadius: CGFloat = 20, accentBorder: Bool = false, @ViewBuilder content: @escaping () -> Content) {
+    init(cornerRadius: CGFloat = 26, accentBorder: Bool = false, @ViewBuilder content: @escaping () -> Content) {
         self.cornerRadius = cornerRadius
         self.accentBorder = accentBorder
         self.content = content
@@ -413,27 +278,28 @@ struct CosmicGlassCard<Content: View>: View {
         content()
             .padding(16)
             .background(
-                theme.surface.opacity(reduceTransparency ? 1.0 : (theme.isLight ? 0.88 : 0.24)),
+                theme.surface.opacity(reduceTransparency ? 1.0 : (theme.isLight ? 0.96 : 0.82)),
                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             )
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(borderGradient, lineWidth: accentBorder ? 1.0 : 0.6)
             )
-            // Specular top highlight
             .overlay(alignment: .top) {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [theme.semanticHighlight, theme.semanticHighlight.opacity(0)],
-                            startPoint: .leading, endPoint: .trailing
-                        )
-                    )
+                LinearGradient(
+                    colors: [.clear, theme.primary.opacity(accentBorder ? 0.62 : 0.24), .clear],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
                     .frame(height: 1)
-                    .padding(.horizontal, cornerRadius * 0.5)
+                    .padding(.horizontal, cornerRadius)
                     .padding(.top, 1)
             }
+            .shadow(
+                color: theme.isLight ? theme.onSurface.opacity(0.08) : Color.black.opacity(0.24),
+                radius: accentBorder ? 18 : 10,
+                y: accentBorder ? 8 : 4
+            )
     }
 
     private var borderGradient: LinearGradient {
@@ -523,6 +389,7 @@ struct CosmicSectionHeader: View {
             CosmicIcon(name: icon, size: 15)
             Text(title)
                 .font(.subheadline.weight(.semibold))
+                .fontDesign(.serif)
                 .foregroundStyle(theme.semanticPrimaryText)
             Spacer()
         }
@@ -917,7 +784,7 @@ struct CosmicScreenHeader: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.title2.weight(.bold))
+                    .font(.system(.title2, design: .serif, weight: .bold))
                     .foregroundStyle(theme.onSurface)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
@@ -1012,12 +879,15 @@ private struct CosmicSegmentButton: View {
             }
             .buttonStyle(.glassProminent)
             .tint(theme.primary)
+            .accessibilityLabel(title)
+            .accessibilityAddTraits(.isSelected)
         } else {
             Button(action: action) {
                 segmentLabel
             }
             .buttonStyle(.glass)
             .tint(theme.onSurface.opacity(0.80))
+            .accessibilityLabel(title)
         }
     }
 
@@ -1031,6 +901,7 @@ private struct CosmicSegmentButton: View {
                 .lineLimit(1)
         }
         .padding(.horizontal, icon.isEmpty ? 6 : 2)
+        .frame(minHeight: 30)
     }
 }
 

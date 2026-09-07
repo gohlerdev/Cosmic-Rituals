@@ -13,12 +13,15 @@ CosmicRituals/
 ├── Engine/                         ← pure Foundation, no SwiftUI
 │   ├── PanchangModels.swift        ZodiacSign, Panchang, NakshatraResult, Muhurta(+Quality), CelestialBody
 │   ├── CosmicEngine.swift          Panchang-focused ephemeris (sidereal, Lahiri ayanamsha)
-│   └── MuhurtaLibrary.swift        rich per-muhurta detail: deity, resonance, favourable/avoid
+│   ├── MuhurtaLibrary.swift        rich per-muhurta detail: deity, resonance, favourable/avoid
+│   ├── PanchangYogaEngine.swift    Vara-Nakshatra combination yogas (Sarvartha/Amrit Siddhi, Guru Pushya, Ravi Yoga)
+│   └── PoojaVidhiCatalog.swift     offline ritual models, search, validation, content policy
 ├── Theme/
 │   └── CosmicTheme.swift           shared cosmic-glass palette + reusable components
 └── Views/
     ├── RootView.swift              hosts PanchangView in the cosmic theme
     ├── PanchangView.swift          Five Limbs + 30 Muhurtas, with live "now" timing
+    ├── PoojaVidhiViews.swift       library, material checklist, detail + guided ritual flow
     └── MuhurtaDetailView.swift     tap-through sheet: deity, description, favourable/avoid
 ```
 
@@ -45,21 +48,44 @@ brought over:
 - **`PanchangModels.swift`** is the *Panchang slice* of the parent `AstroModel.swift` —
   only the value types the Panchang screen touches. `CelestialBody` is retained because a
   nakshatra reports its (dasha) lord.
-- **`CosmicTheme.swift`** is the shared theme/component library, copied verbatim so the
-  app looks identical to its siblings.
-- **`PanchangView.swift`** is copied verbatim from the parent.
+- **`CosmicTheme.swift`** began from the shared theme/component library and now carries
+  app-specific semantic colors, responsive navigation, and motion safeguards.
+- **`PanchangView.swift`** began from the parent surface and is now independently
+  maintained around the location-aware calculation contract described below.
 
 ## Data flow
 
-`RootView` hosts `PanchangView`, which owns a `selectedDate` and a sub-tab selection
-(Five Limbs / 30 Muhurtas). On appear and on any date change it asks the engine for the
-day's facts — the computation is cheap and side-effect-free, so there is no view model
-or persistence.
+`RootView` hosts `PanchangView`, which owns a selected civil date, destination,
+persisted experience/theme preferences, and a `LocationManager`. A
+`CalculationContext` binds that date to explicit coordinates and an IANA time zone.
+The daily Panchang snapshot is cached with its context so SwiftUI updates never show
+values from a previous location while recomputation is in flight.
 
 ```
-selectedDate ──▶ CosmicEngine.getPanchang(date:)  ──▶ Five Limbs section
-             └─▶ CosmicEngine.getMuhurtas(date:)  ──▶ 30 Muhurtas section (live "now")
+selectedDate + RitualLocation ──▶ CalculationContext
+                                      ├─▶ sunrise-anchored five limbs
+                                      ├─▶ four independent transition solves
+                                      ├─▶ solar / kala / choghadiya / hora schedules
+                                      └─▶ 30 day + night muhurtas
 ```
+
+Pooja guidance is deliberately independent of the ephemeris. `PoojaVidhiCatalog` is
+pure Foundation data with deterministic search and executable validation.
+`PoojaVidhiLibraryView` renders that catalog, while `PoojaVidhiDetailView` and
+`GuidedPoojaView` own only ephemeral checklist/progress state. No ritual completion,
+search text, or religious preference leaves the device.
+
+The catalog distinguishes `simpleHousehold`, `extendedHousehold`, and
+`priestRecommended` practice. Formal homa, nyasa, kalasha installation, visarjana,
+initiatory mantras, and supposedly universal priestly procedures are never synthesized.
+See [POOJA_CONTENT.md](POOJA_CONTENT.md).
+
+Premium access is owned by `SubscriptionStore`. It accepts only verified current
+StoreKit entitlements for the configured monthly or annual product, observes transaction
+updates, and preserves access when product merchandising metadata is temporarily
+unavailable. `RootView` owns this app-level service and selects the Premium gate or the
+main Panchang experience. App Intents check the same StoreKit entitlement boundary.
+Trial eligibility and localized prices come from App Store Connect, never device time.
 
 ## The engine
 
@@ -67,12 +93,15 @@ selectedDate ──▶ CosmicEngine.getPanchang(date:)  ──▶ Five Limbs sec
 ayanamsha and Meeus algorithms (Sun §25, Moon §47 47-term series). `getPanchang` derives
 the five limbs from the Sun/Moon sidereal longitudes: **tithi** (12° elongation steps),
 **nakshatra** (Moon's 13°20′ segment + pada), **yoga** (Sun+Moon), **karana** (half-tithi),
-and **vara** (weekday). `getMuhurtas` divides the local day/night (from NOAA sunrise/sunset)
-into 15 + 15 named windows, each tagged with its classical auspiciousness and marked
-`isCurrent` against the clock.
+and **vara** (weekday). Each changing limb has a separately solved next boundary.
+`getMuhurtas` divides the local day/night (from NOAA sunrise/sunset) into 15 + 15
+named windows, each tagged with its classical auspiciousness and marked `isCurrent`
+against the clock. See [ACCURACY.md](ACCURACY.md) for the calculation contract,
+fixtures, tolerances, and quarantined prototypes.
 
-> Muhurta timings use a Delhi default location (28.61° N, 77.21° E). For other locations,
-> pass `latDeg`/`lonDeg` to `getMuhurtas`.
+> New Delhi is the visible first-run default, not a hidden calculation fallback.
+> Once the user chooses a city or current location, every daily calculation, export,
+> and App Intent uses that explicit saved context.
 
 ## Theme
 

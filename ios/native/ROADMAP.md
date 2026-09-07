@@ -1,116 +1,119 @@
-# Cosmic Rituals — Product Roadmap
+# Cosmic Rituals — product status and roadmap
 
-> Goal: the definitive native iOS Vedic Panchang experience — surpassing drikpanchang.com on UX
-> while matching (then exceeding) it on content depth. On-device, private, no account required.
+> Product standard: a definitive, private native Panchang experience whose
+> calculation claims never outrun its evidence.
 
----
+Status words in this document are strict:
 
-## Baseline (shipped — v0.1)
+- **Shipping** means reachable in the app target and covered by a current build.
+- **Validated** means it also has an automated invariant or independent fixture.
+- **Prototype** means source exists but is not a user-facing capability.
+- **Pending** means it is not implemented.
 
-| Feature | Status |
-|---------|--------|
-| Five limbs — Vara, Tithi, Nakshatra, Yoga, Karana | ✅ |
-| 30 day + night muhurtas with quality ratings | ✅ |
-| Muhurta detail sheet (deity, resonance, activities) | ✅ |
-| Rahu Kala + Yamaganda (computed from sunrise) | ✅ |
-| Nakshatra detail — lord, gana, pada, symbol | ✅ |
-| Moon sign + tithi phase (Shukla/Krishna) | ✅ |
-| Animated starfield + Liquid Glass UI | ✅ |
-| 6 color themes (3 dark, 3 light) | ✅ |
-| Location-aware sunrise/sunset | ✅ |
-| Date picker | ✅ |
+## Current shipping surface
 
----
+| Capability | Status | Evidence / limit |
+|---|---|---|
+| Vara, Tithi, Nakshatra, Yoga, Karana | Shipping + validated | Anchored to selected-location sunrise |
+| All four limb transition times | Shipping + validated | Independent Paris fixture; chronological boundary invariants |
+| Moon sign, Nakshatra Pada, lord, and Gana | Shipping | Evaluated at the same sunrise reference |
+| Sunrise and sunset | Shipping + validated | Four public civil-time fixtures; explicit polar no-result |
+| Brahma Muhurta | Shipping | 96–48 minutes before real sunrise |
+| Abhijit Muhurta | Shipping + validated | Daylight-scaled; omitted on Wednesday |
+| Rahu Kala, Yamaganda, Gulika Kala | Shipping + validated | Published Mumbai fixture; local daylight divisions |
+| Dur Muhurta | Shipping + validated | Correct weekday table, including Tuesday night period |
+| Choghadiya | Shipping | Eight local day + eight local night periods |
+| Hora | Shipping | Twelve local day + twelve local night planetary hours |
+| 30 Ahoratra Muhurtas | Shipping | Fifteen day + fifteen night windows |
+| Muhurta details and activity filter | Shipping | Traditional symbolic guidance, not prediction |
+| Monthly sunrise-snapshot calendar | Shipping | Cache keyed by location and time zone |
+| Offline location catalog | Shipping + validated | 33,909 GeoNames cities; CC BY 4.0 attribution |
+| Current-location mode | Shipping + validated | Freshness, authorization, coordinate, and accuracy gates |
+| Text and PDF sharing | Shipping | Uses the active calculation time zone and sunrise reference |
+| App Intents / Shortcuts | Shipping | Requires a persisted explicit location |
+| Three information layouts + six themes | Shipping + validated | Dynamic Type, contrast, Reduce Motion, VoiceOver labels |
+| Calculation-integrity disclosure | Shipping | Method, privacy, tolerance, and ceremonial-use caveat |
 
-## Phase 1 — Daily-Use Parity with drikpanchang  `[✅ shipped v0.2]`
+The detailed method and fixture record is in [ACCURACY.md](ACCURACY.md).
 
-| Feature | Status |
-|---------|--------|
-| 1.1 Choghadiya (8 day + 8 night periods, live highlight) | ✅ |
-| 1.2 Hora (24 planetary hours, Chaldean cycle) | ✅ |
-| 1.3 Moonrise & Moonset (Meeus §15 + parallax) | ✅ |
-| 1.4 Gulika Kala | ✅ |
-| 1.4 Dur Muhurta (Muhurta Chintamani table) | ✅ |
-| 1.4 Varjyam | pending |
-| 1.5 Brahma Muhurta + Abhijit Muhurta callouts | ✅ |
-| 1.6 Sun sign + Sun nakshatra | ✅ |
-| 1.7 Tithi transition time (binary search) | ✅ |
+## Platform truth
 
----
+| Capability | Status | What remains |
+|---|---|---|
+| Automatic notifications | Pending / visibly off | Location/date-safe scheduling, permission UX, tests |
+| Home Screen widgets | Prototype source only | Widget extension target, App Group, signing, shared context, E2E tests |
+| Live Activity / Dynamic Island | Pending | ActivityKit target and lifecycle design |
+| Apple Watch | Pending | Watch target, shared calculation contract, device QA |
 
-## Phase 2 — Content Depth & Discovery  `[✅ shipped v0.3]`
+The app and documentation must not describe prototype source as a shipping
+capability.
 
-| Feature | Status |
-|---------|--------|
-| 2.1 Panchang limb detail sheets (Tithi/Yoga/Karana) | ✅ |
-| 2.2 Monthly calendar view with tithi/yoga quality dots | ✅ |
-| 2.3 Festival & Vrat calendar (40+ festivals) | ✅ |
-| 2.4 "Best time today" card with activity picker | ✅ |
-| 2.5 Muhurta timeline visualization with live cursor | ✅ |
+## Calculation work intentionally quarantined
 
----
+The following source is preserved for research but is not routed into shipping
+navigation because it does not yet meet the evidence bar:
 
-## Phase 3 — Platform & Ecosystem  `[partial v0.4]`
+| Area | Status | Required before surfacing |
+|---|---|---|
+| Moonrise and moonset | Prototype | Topocentric altitude solver, parallax, multiple global fixtures |
+| Festival and vrata calendar | Prototype | True lunisolar month, Adhika/Kshaya handling, regional precedence rules, fixtures |
+| Extended Samvat / Masa / Anandadi panel | Prototype | Rule-complete calendar derivation and regional settings |
+| Nine Graha positions | Prototype | Reference-grade ephemeris and error envelope |
+| Varjyam / Amrit Kalam | Pending | Nakshatra-based intervals and published fixtures |
 
-| Feature | Status |
-|---------|--------|
-| 3.1 WidgetKit (small + medium) | ✅ source files ready; **add target in Xcode** |
-| 3.2 Live Activity + Dynamic Island | pending (needs ActivityKit target) |
-| 3.3 Notifications (muhurta + Brahma Muhurta) | ✅ |
-| 3.4 Siri Shortcuts / App Intents (3 intents) | ✅ |
-| 3.5 Share sheet (text + PDF export) | ✅ |
+## Next product phases
 
----
+### 1. Reference-grade astronomy
 
-## Phase 4 — Advanced Jyotish  `[✅ shipped v0.5]`
+- Evaluate a legally compatible high-precision ephemeris strategy.
+- Add global Moonrise/Moonset and Graha fixtures before enabling their views.
+- Expand five-limb fixtures across ayanamsha-boundary and skipped/extended-tithi cases.
+- Add observer elevation and refraction settings only if their effect can be
+  explained without creating false confidence.
 
-| Feature | Status |
-|---------|--------|
-| 4.1 Planetary hora real-time display | ✅ |
-| 4.2 Chandra Bala & Tara Bala | ✅ |
-| 4.3 Transit alerts (Jupiter + Saturn sign change notifications) | ✅ |
-| 4.3 Nine Graha Positions (Schlyter orbital elements, sidereal) | ✅ |
-| 4.4 Panchang PDF export (dark-theme A4) | ✅ |
-| 4.5 Apple Watch companion | pending (needs WatchOS target) |
+### 2. Rule-complete observance calendar
 
----
+- Model Amanta and Purnimanta lunar months from actual lunations.
+- Detect Adhika and Kshaya months.
+- Encode event-specific sunrise, midnight, Pradosha, and tithi-precedence rules.
+- Make regional school an explicit user choice.
+- Ship festival data only after multi-year, multi-city fixture validation.
 
-## Technical Debt & Ongoing
+### 3. Native ecosystem
 
-| Item | Status |
-|------|--------|
-| CosmicTheme.swift (1300 lines) — split into components | pending |
-| Panchang struct sunriseTime/sunsetTime always nil | pending |
-| Unit tests for CosmicEngine | ✅ written; **add test target in Xcode** |
-| Tithi name duplication (Pratipada appears twice) | pending |
-| Varjyam (nakshatra+pada based inauspicious period) | pending |
-| App Group entitlement for widget location sharing | **enable in Xcode Signing & Capabilities** |
-| WidgetKit target — add in Xcode and enable App Group | **manual Xcode step** |
+- Add the WidgetKit target and shared context contract.
+- Add notifications only with rescheduling on location, time-zone, and date changes.
+- Design Live Activity and Watch surfaces around the next verified transition,
+  not around duplicated calculation code.
 
----
+### 4. International depth
 
-## Competitive Positioning
+- Localize interface, Panchang terminology, numeral style, and 12/24-hour time.
+- Add transliteration preferences without changing calculation identity.
+- Validate right-to-left layout and the largest Dynamic Type sizes.
 
-| Feature | DrikPanchang (web) | Cosmic Rituals |
-|---------|-------------------|----------------|
-| Native iOS UX | ✗ | ✅ |
-| Muhurta detail (deity/activities) | Basic | ✅ Rich |
-| Live animated UI | ✗ | ✅ |
-| Offline / on-device | Partial | ✅ 100% |
-| Choghadiya | ✅ | ✅ |
-| Hora | ✅ | ✅ |
-| Moonrise/Moonset | ✅ | ✅ |
-| Monthly calendar | ✅ | ✅ |
-| Festivals | ✅ | ✅ |
-| Nine Graha Positions | ✅ | ✅ |
-| Dur Muhurta | ✅ | ✅ |
-| Chandra/Tara Bala | ✅ | ✅ |
-| Transit alerts | ✗ | ✅ |
-| Widgets | ✗ | ✅ (source ready) |
-| Siri integration | ✗ | ✅ |
-| PDF export | ✗ | ✅ |
-| Privacy / no account | ✗ | ✅ |
+## Release gates
 
----
+Every release must pass:
 
-*Last updated: 2026-07-01*
+```bash
+xcodebuild \
+  -project CosmicRituals.xcodeproj \
+  -scheme CosmicRituals \
+  -destination 'generic/platform=iOS Simulator' \
+  CODE_SIGNING_ALLOWED=NO \
+  build-for-testing
+
+xcodebuild \
+  -project CosmicRituals.xcodeproj \
+  -scheme CosmicRituals \
+  -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
+  CODE_SIGNING_ALLOWED=NO \
+  test
+```
+
+It must also receive simulator QA for the three experience modes, dark and light
+appearance, location changes, a next-day transition, polar no-schedule behavior,
+Reduce Motion, and an accessibility Dynamic Type size.
+
+Last truthfulness review: 2026-07-27.

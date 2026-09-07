@@ -6,8 +6,7 @@ import Foundation
 /// the calendar and time zone beside the coordinates prevents that selected day from
 /// silently becoming the previous UTC day in eastern time zones.
 struct CalculationContext: Equatable, Sendable {
-    static let dailySnapshotReferenceHour = 12
-    static let dailySnapshotDisclosure = "Daily Panchang reference · sampled at 12:00 PM local time"
+    static let polarFallbackReferenceHour = 12
 
     let localDay: Date
     let latitude: Double
@@ -45,12 +44,12 @@ struct CalculationContext: Equatable, Sendable {
         calendar.startOfDay(for: localDay)
     }
 
-    /// A deterministic instant for day-level lunar calculations.
+    /// Deterministic fallback for dates and latitudes where sunrise is unavailable.
     /// Noon exists on ordinary DST-transition days and does not inherit a hidden
     /// time component from whichever date picker last changed the selection.
     var localNoon: Date {
         calendar.date(
-            bySettingHour: Self.dailySnapshotReferenceHour,
+            bySettingHour: Self.polarFallbackReferenceHour,
             minute: 0,
             second: 0,
             of: localDayStart
@@ -76,6 +75,24 @@ struct CalculationContext: Equatable, Sendable {
 /// formatted in the active calculation location's time zone, never implicitly in
 /// the device zone.
 extension Date {
+    /// Reinterprets the source location's year-month-day in another time zone.
+    /// The selected Panchang value is a civil day, not an instant; using local
+    /// noon avoids nonexistent-midnight edge cases on historical clock changes.
+    func ritualCivilDay(
+        preservingDateFrom sourceTimeZone: TimeZone,
+        into targetTimeZone: TimeZone
+    ) -> Date {
+        var sourceCalendar = Calendar(identifier: .gregorian)
+        sourceCalendar.timeZone = sourceTimeZone
+        let day = sourceCalendar.dateComponents([.year, .month, .day], from: self)
+
+        var targetCalendar = Calendar(identifier: .gregorian)
+        targetCalendar.timeZone = targetTimeZone
+        var targetComponents = day
+        targetComponents.hour = CalculationContext.polarFallbackReferenceHour
+        return targetCalendar.date(from: targetComponents) ?? self
+    }
+
     func ritualShortTime(in timeZone: TimeZone, locale: Locale = .autoupdatingCurrent) -> String {
         let formatter = DateFormatter()
         formatter.locale = locale
@@ -104,5 +121,20 @@ extension Date {
         formatter.timeZone = timeZone
         formatter.setLocalizedDateFormatFromTemplate(template)
         return formatter.string(from: self)
+    }
+
+    /// A clock time for same-day events and an unambiguous civil date plus time
+    /// when an astronomical transition falls after midnight in the active place.
+    func ritualTransitionLabel(
+        relativeTo referenceDate: Date,
+        in timeZone: TimeZone,
+        locale: Locale = .autoupdatingCurrent
+    ) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let time = ritualShortTime(in: timeZone, locale: locale)
+        guard !calendar.isDate(self, inSameDayAs: referenceDate) else { return time }
+        let civilDate = ritualDate(template: "EEE d MMM", in: timeZone, locale: locale)
+        return "\(civilDate) · \(time)"
     }
 }

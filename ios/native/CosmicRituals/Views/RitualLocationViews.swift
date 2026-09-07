@@ -55,6 +55,7 @@ struct LocationContextBar: View {
                     .font(.caption.weight(.bold))
                     .foregroundStyle(theme.semanticSecondaryText)
             }
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, 16)
             .padding(.vertical, 9)
             .background(theme.surface.opacity(theme.isLight ? 0.96 : 0.88))
@@ -64,6 +65,7 @@ struct LocationContextBar: View {
                     .frame(height: 0.5)
             }
         }
+        .frame(maxWidth: .infinity)
         .buttonStyle(.plain)
         .accessibilityLabel("Calculation location")
         .accessibilityValue(
